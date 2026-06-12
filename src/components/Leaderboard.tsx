@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import GemBadge from './GemBadge';
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import GemBadge from "./GemBadge";
 
 interface LeaderboardEntry {
   id: string;
@@ -10,7 +10,13 @@ interface LeaderboardEntry {
   gems: number;
 }
 
-export default function Leaderboard({ workspaceId, currentMemberId }: { workspaceId: string; currentMemberId?: string }) {
+export default function Leaderboard({
+  workspaceId,
+  currentMemberId,
+}: {
+  workspaceId: string;
+  currentMemberId?: string;
+}) {
   const [members, setMembers] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
@@ -18,10 +24,10 @@ export default function Leaderboard({ workspaceId, currentMemberId }: { workspac
 
     async function load() {
       const { data } = await supabase
-        .from('members')
-        .select('id, display_name, gems')
-        .eq('workspace_id', workspaceId)
-        .order('gems', { ascending: false });
+        .from("members")
+        .select("id, display_name, gems")
+        .eq("workspace_id", workspaceId)
+        .order("gems", { ascending: false });
 
       if (data) setMembers(data);
     }
@@ -30,18 +36,25 @@ export default function Leaderboard({ workspaceId, currentMemberId }: { workspac
 
     // Realtime subscription
     const channel = supabase
-      .channel('leaderboard')
+      .channel("leaderboard")
       .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'members', filter: `workspace_id=eq.${workspaceId}` },
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "members",
+          filter: `workspace_id=eq.${workspaceId}`,
+        },
         () => load()
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [workspaceId]);
 
-  const medalColors = ['text-gold', 'text-silver', 'text-bronze'];
+  const medalColors = ["text-gold", "text-silver", "text-bronze"];
 
   return (
     <div className="space-y-2">
@@ -49,22 +62,24 @@ export default function Leaderboard({ workspaceId, currentMemberId }: { workspac
         <div
           key={member.id}
           className={`flex items-center gap-3 rounded-lg p-3 ${
-            member.id === currentMemberId ? 'bg-accent/10 border border-accent/30' : 'bg-card'
+            member.id === currentMemberId ? "bg-accent/10 border-accent/30 border" : "bg-card"
           }`}
         >
-          <span className={`w-8 text-center font-bold text-lg ${i < 3 ? medalColors[i] : 'text-silver'}`}>
+          <span
+            className={`w-8 text-center text-lg font-bold ${i < 3 ? medalColors[i] : "text-silver"}`}
+          >
             {i + 1}
           </span>
-          <span className="flex-1 font-medium truncate">
+          <span className="flex-1 truncate font-medium">
             {member.display_name}
-            {member.id === currentMemberId && <span className="text-xs text-silver ml-2">(you)</span>}
+            {member.id === currentMemberId && (
+              <span className="text-silver ml-2 text-xs">(you)</span>
+            )}
           </span>
           <GemBadge gems={member.gems} size="sm" />
         </div>
       ))}
-      {members.length === 0 && (
-        <p className="text-silver text-center py-8">No members yet</p>
-      )}
+      {members.length === 0 && <p className="text-silver py-8 text-center">No members yet</p>}
     </div>
   );
 }

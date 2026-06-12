@@ -1,15 +1,15 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 export default function CountdownTimer({ targetDate }: { targetDate: string }) {
-  const [timeLeft, setTimeLeft] = useState('');
+  const [timeLeft, setTimeLeft] = useState("");
 
   useEffect(() => {
     function update() {
       const diff = new Date(targetDate).getTime() - Date.now();
       if (diff <= 0) {
-        setTimeLeft('Started');
+        setTimeLeft("Started");
         return;
       }
 
@@ -32,7 +32,5 @@ export default function CountdownTimer({ targetDate }: { targetDate: string }) {
     return () => clearInterval(interval);
   }, [targetDate]);
 
-  return (
-    <span className="font-mono text-sm text-silver">{timeLeft}</span>
-  );
+  return <span className="text-silver font-mono text-sm">{timeLeft}</span>;
 }

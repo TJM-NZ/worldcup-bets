@@ -1,14 +1,10 @@
-'use client';
+"use client";
 
-import { use } from 'react';
-import { useAuth, useMember } from '@/lib/hooks';
-import Leaderboard from '@/components/Leaderboard';
+import { use } from "react";
+import { useAuth, useMember } from "@/lib/hooks";
+import Leaderboard from "@/components/Leaderboard";
 
-export default function LeaderboardPage({
-  params,
-}: {
-  params: Promise<{ workspaceId: string }>;
-}) {
+export default function LeaderboardPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = use(params);
   const { userId } = useAuth();
   const { member } = useMember(workspaceId, userId);

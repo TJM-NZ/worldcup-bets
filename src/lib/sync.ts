@@ -1,7 +1,7 @@
-import { createServiceClient } from './supabase/server';
-import { fetchTeams, fetchMatches, fetchStandings } from './football-api';
-import { calculatePayouts, winnerToPrediction } from './betting';
-import { FdMatch } from './types';
+import { createServiceClient } from "./supabase/server";
+import { fetchTeams, fetchMatches, fetchStandings } from "./football-api";
+import { calculatePayouts, winnerToPrediction } from "./betting";
+import { FdMatch } from "./types";
 
 /** Seed teams from football-data.org */
 export async function syncTeams(): Promise<number> {
@@ -15,7 +15,7 @@ export async function syncTeams(): Promise<number> {
   const groupMap = new Map<number, string>();
   for (const s of standings) {
     // group comes as "GROUP_A" etc, extract letter
-    const letter = s.group.replace('GROUP_', '');
+    const letter = s.group.replace("GROUP_", "");
     groupMap.set(s.team.id, letter);
   }
 
@@ -27,8 +27,8 @@ export async function syncTeams(): Promise<number> {
     group_letter: groupMap.get(t.id) || null,
   }));
 
-  const { error } = await supabase.from('teams').upsert(rows, {
-    onConflict: 'id',
+  const { error } = await supabase.from("teams").upsert(rows, {
+    onConflict: "id",
   });
 
   if (error) throw new Error(`Team sync failed: ${error.message}`);
@@ -44,9 +44,7 @@ export async function syncMatches(): Promise<{
   const apiMatches = await fetchMatches();
 
   // Get current match statuses to detect newly finished
-  const { data: existingMatches } = await supabase
-    .from('matches')
-    .select('id, status');
+  const { data: existingMatches } = await supabase.from("matches").select("id, status");
 
   const existingStatusMap = new Map<number, string>();
   for (const m of existingMatches || []) {
@@ -68,25 +66,19 @@ export async function syncMatches(): Promise<{
     winner: m.score.winner,
   }));
 
-  const { error: upsertError } = await supabase
-    .from('matches')
-    .upsert(rows, { onConflict: 'id' });
+  const { error: upsertError } = await supabase.from("matches").upsert(rows, { onConflict: "id" });
 
-  if (upsertError)
-    throw new Error(`Match sync failed: ${upsertError.message}`);
+  if (upsertError) throw new Error(`Match sync failed: ${upsertError.message}`);
 
   // Find newly finished matches
   const newlyFinished = apiMatches.filter(
-    (m) =>
-      m.status === 'FINISHED' &&
-      existingStatusMap.get(m.id) !== 'FINISHED' &&
-      m.score.winner
+    (m) => m.status === "FINISHED" && existingStatusMap.get(m.id) !== "FINISHED" && m.score.winner
   );
 
   // Find newly postponed/cancelled matches (for refunds)
   const newlyCancelled = apiMatches.filter(
     (m) =>
-      (m.status === 'POSTPONED' || m.status === 'CANCELLED') &&
+      (m.status === "POSTPONED" || m.status === "CANCELLED") &&
       existingStatusMap.has(m.id) &&
       existingStatusMap.get(m.id) !== m.status
   );
@@ -107,10 +99,7 @@ export async function syncMatches(): Promise<{
 }
 
 /** Resolve bets for a finished match using parimutuel payout */
-async function resolveMatch(
-  matchId: number,
-  winnerRaw: string
-): Promise<number> {
+async function resolveMatch(matchId: number, winnerRaw: string): Promise<number> {
   const winner = winnerToPrediction(winnerRaw);
   if (!winner) return 0;
 
@@ -118,19 +107,19 @@ async function resolveMatch(
 
   // Get all unresolved bets for this match
   const { data: bets, error } = await supabase
-    .from('bets')
-    .select('id, member_id, prediction, gems_wagered')
-    .eq('match_id', matchId)
-    .eq('resolved', false);
+    .from("bets")
+    .select("id, member_id, prediction, gems_wagered")
+    .eq("match_id", matchId)
+    .eq("resolved", false);
 
   if (error || !bets || bets.length === 0) return 0;
 
   // Group bets by workspace
   const { data: members } = await supabase
-    .from('members')
-    .select('id, workspace_id')
+    .from("members")
+    .select("id, workspace_id")
     .in(
-      'id',
+      "id",
       bets.map((b) => b.member_id)
     );
 
@@ -142,10 +131,7 @@ async function resolveMatch(
   }
 
   // Group bets by workspace
-  const workspaceBets = new Map<
-    string,
-    typeof bets
-  >();
+  const workspaceBets = new Map<string, typeof bets>();
   for (const bet of bets) {
     const wsId = memberWorkspaceMap.get(bet.member_id);
     if (!wsId) continue;
@@ -161,7 +147,7 @@ async function resolveMatch(
       wsBets.map((b) => ({
         id: b.id,
         member_id: b.member_id,
-        prediction: b.prediction as 'HOME' | 'AWAY' | 'DRAW',
+        prediction: b.prediction as "HOME" | "AWAY" | "DRAW",
         gems_wagered: b.gems_wagered,
       })),
       winner
@@ -170,12 +156,12 @@ async function resolveMatch(
     // Update bets and member gems
     for (const payout of payouts) {
       await supabase
-        .from('bets')
+        .from("bets")
         .update({ resolved: true, gems_won: payout.gems_won })
-        .eq('id', payout.bet_id);
+        .eq("id", payout.bet_id);
 
       if (payout.gems_won > 0) {
-        await supabase.rpc('increment_gems', {
+        await supabase.rpc("increment_gems", {
           p_member_id: payout.member_id,
           p_amount: payout.gems_won,
         });
@@ -192,20 +178,20 @@ async function resolveMatch(
 async function refundMatch(matchId: number): Promise<number> {
   const supabase = createServiceClient();
   const { data: bets } = await supabase
-    .from('bets')
-    .select('id, member_id, gems_wagered')
-    .eq('match_id', matchId)
-    .eq('resolved', false);
+    .from("bets")
+    .select("id, member_id, gems_wagered")
+    .eq("match_id", matchId)
+    .eq("resolved", false);
 
   if (!bets || bets.length === 0) return 0;
 
   for (const bet of bets) {
     await supabase
-      .from('bets')
+      .from("bets")
       .update({ resolved: true, gems_won: bet.gems_wagered })
-      .eq('id', bet.id);
+      .eq("id", bet.id);
 
-    await supabase.rpc('increment_gems', {
+    await supabase.rpc("increment_gems", {
       p_member_id: bet.member_id,
       p_amount: bet.gems_wagered,
     });
@@ -218,9 +204,9 @@ async function refundMatch(matchId: number): Promise<number> {
 export async function shouldSync(): Promise<boolean> {
   const supabase = createServiceClient();
   const { data: lastSync } = await supabase
-    .from('sync_log')
-    .select('synced_at')
-    .order('synced_at', { ascending: false })
+    .from("sync_log")
+    .select("synced_at")
+    .order("synced_at", { ascending: false })
     .limit(1)
     .single();
 
@@ -237,10 +223,10 @@ export async function shouldSync(): Promise<boolean> {
   todayEnd.setUTCHours(23, 59, 59, 999);
 
   const { data: todayMatches } = await supabase
-    .from('matches')
-    .select('id, utc_date, status')
-    .gte('utc_date', todayStart.toISOString())
-    .lte('utc_date', todayEnd.toISOString());
+    .from("matches")
+    .select("id, utc_date, status")
+    .gte("utc_date", todayStart.toISOString())
+    .lte("utc_date", todayEnd.toISOString());
 
   // No matches today → only sync once at 06:00 UTC
   if (!todayMatches || todayMatches.length === 0) {
@@ -249,7 +235,7 @@ export async function shouldSync(): Promise<boolean> {
   }
 
   // Check if any matches are live
-  const liveStatuses = ['IN_PLAY', 'PAUSED', 'SUSPENDED'];
+  const liveStatuses = ["IN_PLAY", "PAUSED", "SUSPENDED"];
   const hasLive = todayMatches.some((m) => liveStatuses.includes(m.status));
 
   if (hasLive) {
@@ -259,7 +245,7 @@ export async function shouldSync(): Promise<boolean> {
 
   // Check time to next match
   const upcoming = todayMatches
-    .filter((m) => m.status === 'TIMED' || m.status === 'SCHEDULED')
+    .filter((m) => m.status === "TIMED" || m.status === "SCHEDULED")
     .map((m) => new Date(m.utc_date).getTime());
 
   if (upcoming.length > 0) {
@@ -276,12 +262,10 @@ export async function shouldSync(): Promise<boolean> {
   }
 
   // All matches finished today
-  const allFinished = todayMatches.every((m) => m.status === 'FINISHED');
+  const allFinished = todayMatches.every((m) => m.status === "FINISHED");
   if (allFinished) {
     // One final sync after all done, then idle
-    const lastMatchEnd = Math.max(
-      ...todayMatches.map((m) => new Date(m.utc_date).getTime())
-    );
+    const lastMatchEnd = Math.max(...todayMatches.map((m) => new Date(m.utc_date).getTime()));
     // Sync once within 10 min after last match
     if (now.getTime() - lastMatchEnd < 600000 && secondsSinceSync > 300) {
       return true;
@@ -294,12 +278,9 @@ export async function shouldSync(): Promise<boolean> {
 }
 
 /** Log a sync run */
-export async function logSync(
-  matchesUpdated: number,
-  error?: string
-): Promise<void> {
+export async function logSync(matchesUpdated: number, error?: string): Promise<void> {
   const supabase = createServiceClient();
-  await supabase.from('sync_log').insert({
+  await supabase.from("sync_log").insert({
     matches_updated: matchesUpdated,
     error: error || null,
   });

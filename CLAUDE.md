@@ -8,13 +8,13 @@ Next.js 16 (App Router, standalone) | Supabase (Postgres, anon auth, realtime, R
 
 ## Key Files
 
-| Path | Purpose |
-|------|---------|
-| `supabase/migrations/001_initial_schema.sql` | All tables, RLS, functions |
-| `src/lib/sync.ts` | football-data.org sync + bet resolution |
-| `src/lib/betting.ts` | Payout calculation, validation |
-| `src/app/api/sync/route.ts` | Cron-triggered sync endpoint |
-| `vercel.json` | Cron config (every 60s) |
+| Path                                         | Purpose                                 |
+| -------------------------------------------- | --------------------------------------- |
+| `supabase/migrations/001_initial_schema.sql` | All tables, RLS, functions              |
+| `src/lib/sync.ts`                            | football-data.org sync + bet resolution |
+| `src/lib/betting.ts`                         | Payout calculation, validation          |
+| `src/app/api/sync/route.ts`                  | Cron-triggered sync endpoint            |
+| `vercel.json`                                | Cron config (every 60s)                 |
 
 ## Env Vars
 
@@ -22,4 +22,12 @@ Next.js 16 (App Router, standalone) | Supabase (Postgres, anon auth, realtime, R
 
 ## Commands
 
-`npm run dev` — local dev | `npm run build` — production build
+`npm run dev` — local dev | `npm run build` — production build | `npm run typecheck` — tsc --noEmit | `npm run format` — prettier write | `npm run format:check` — prettier check
+
+## Git Workflow
+
+Branches: `main` (production) ← `develop` (integration) ← feature branches
+Feature branches: `feat/`, `fix/`, `refactor/`, `chore/` off `develop`, merged via PR
+Hotfixes: `hotfix/` off `main`, PR to `main`, sync back to `develop`
+
+Pre-commit (Husky): lint-staged (prettier + eslint) → tsc --noEmit

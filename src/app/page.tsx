@@ -1,37 +1,39 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LandingPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose');
-  const [workspaceName, setWorkspaceName] = useState('');
-  const [displayName, setDisplayName] = useState('');
-  const [inviteCode, setInviteCode] = useState('');
+  const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'no-workspace'>('loading');
+  const [error, setError] = useState("");
+  const [authState, setAuthState] = useState<"loading" | "unauthenticated" | "no-workspace">(
+    "loading"
+  );
   const [userId, setUserId] = useState<string | null>(null);
   const [showInviteInput, setShowInviteInput] = useState(false);
-  const [heroInviteCode, setHeroInviteCode] = useState('');
+  const [heroInviteCode, setHeroInviteCode] = useState("");
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) {
-        setAuthState('unauthenticated');
+        setAuthState("unauthenticated");
         return;
       }
 
       setUserId(session.user.id);
 
       const { data: members } = await supabase
-        .from('members')
-        .select('workspace_id')
-        .eq('user_id', session.user.id)
+        .from("members")
+        .select("workspace_id")
+        .eq("user_id", session.user.id)
         .limit(1);
 
       if (members && members.length > 0) {
@@ -39,7 +41,7 @@ export default function LandingPage() {
         return;
       }
 
-      setAuthState('no-workspace');
+      setAuthState("no-workspace");
     });
   }, [router]);
 
@@ -48,12 +50,12 @@ export default function LandingPage() {
     if (!workspaceName.trim() || !displayName.trim()) return;
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await fetch('/api/workspace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workspaceName: workspaceName.trim(),
           displayName: displayName.trim(),
@@ -66,7 +68,7 @@ export default function LandingPage() {
 
       router.push(`/workspace/${data.workspace.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create workspace');
+      setError(err instanceof Error ? err.message : "Failed to create workspace");
     } finally {
       setLoading(false);
     }
@@ -77,12 +79,12 @@ export default function LandingPage() {
     if (!inviteCode.trim() || !displayName.trim()) return;
 
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const res = await fetch('/api/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           inviteCode: inviteCode.trim(),
           displayName: displayName.trim(),
@@ -95,50 +97,55 @@ export default function LandingPage() {
 
       router.push(`/workspace/${data.workspace.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join workspace');
+      setError(err instanceof Error ? err.message : "Failed to join workspace");
     } finally {
       setLoading(false);
     }
   }
 
-  if (authState === 'loading') {
+  if (authState === "loading") {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+      <div className="flex flex-1 items-center justify-center">
+        <div className="border-accent h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
 
-  if (authState === 'unauthenticated') {
+  if (authState === "unauthenticated") {
     return (
       <>
         <header className="flex items-center justify-between px-6 py-4">
           <span className="text-xl font-bold">
             <span className="text-accent">Office</span>Bets
           </span>
-          <Link href="/login" className="text-sm text-silver hover:text-foreground transition-colors">
+          <Link
+            href="/login"
+            className="text-silver hover:text-foreground text-sm transition-colors"
+          >
             Log in
           </Link>
         </header>
-        <main className="flex-1 flex items-center justify-center px-4">
+        <main className="flex flex-1 items-center justify-center px-4">
           <div className="w-full max-w-md space-y-8 text-center">
             <div>
-              <h1 className="text-5xl font-bold mb-3">
+              <h1 className="mb-3 text-5xl font-bold">
                 <span className="text-accent">Office</span>Bets
               </h1>
-              <h6 className="text-silver text-sm">brought to you by Naila&apos;s HR safe gambling</h6>
+              <h6 className="text-silver text-sm">
+                brought to you by Naila&apos;s HR safe gambling
+              </h6>
             </div>
             <div className="space-y-3">
               <Link
                 href="/signup"
-                className="block w-full rounded-lg bg-accent px-4 py-4 font-bold text-white text-center transition-colors hover:bg-accent-hover"
+                className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
               >
                 Start Playing
               </Link>
               {!showInviteInput ? (
                 <button
                   onClick={() => setShowInviteInput(true)}
-                  className="w-full rounded-lg border-2 border-card-hover px-4 py-4 font-bold transition-colors hover:border-accent hover:text-accent"
+                  className="border-card-hover hover:border-accent hover:text-accent w-full rounded-lg border-2 px-4 py-4 font-bold transition-colors"
                 >
                   Accept Invite
                 </button>
@@ -149,12 +156,12 @@ export default function LandingPage() {
                     value={heroInviteCode}
                     onChange={(e) => setHeroInviteCode(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter' && heroInviteCode.trim()) {
+                      if (e.key === "Enter" && heroInviteCode.trim()) {
                         router.push(`/join/${heroInviteCode.trim()}`);
                       }
                     }}
                     placeholder="Invite code"
-                    className="flex-1 rounded-lg bg-background border border-card-hover px-4 py-3 font-mono focus:outline-none focus:border-accent"
+                    className="bg-background border-card-hover focus:border-accent flex-1 rounded-lg border px-4 py-3 font-mono focus:outline-none"
                     autoFocus
                   />
                   <button
@@ -163,7 +170,7 @@ export default function LandingPage() {
                         router.push(`/join/${heroInviteCode.trim()}`);
                       }
                     }}
-                    className="rounded-lg bg-accent px-6 py-3 font-bold text-white transition-colors hover:bg-accent-hover"
+                    className="bg-accent hover:bg-accent-hover rounded-lg px-6 py-3 font-bold text-white transition-colors"
                   >
                     Go
                   </button>
@@ -178,54 +185,54 @@ export default function LandingPage() {
 
   // Authenticated, no workspace
   return (
-    <main className="flex-1 flex items-center justify-center px-4">
+    <main className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8 text-center">
         <div>
-          <h1 className="text-5xl font-bold mb-3">
+          <h1 className="mb-3 text-5xl font-bold">
             <span className="text-accent">Office</span>Bets
           </h1>
           <h6 className="text-silver text-sm">brought to you by Naila&apos;s HR safe gambling</h6>
         </div>
 
-        {mode === 'choose' && (
+        {mode === "choose" && (
           <div className="space-y-3">
             <button
-              onClick={() => setMode('create')}
-              className="block w-full rounded-lg bg-accent px-4 py-4 font-bold text-white text-center transition-colors hover:bg-accent-hover"
+              onClick={() => setMode("create")}
+              className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
             >
               Start Playing
             </button>
             <button
-              onClick={() => setMode('join')}
-              className="w-full rounded-lg border-2 border-card-hover px-4 py-4 font-bold transition-colors hover:border-accent hover:text-accent"
+              onClick={() => setMode("join")}
+              className="border-card-hover hover:border-accent hover:text-accent w-full rounded-lg border-2 px-4 py-4 font-bold transition-colors"
             >
               Accept Invite
             </button>
           </div>
         )}
 
-        {mode === 'create' && (
-          <form onSubmit={handleCreate} className="space-y-4 bg-card rounded-xl p-6">
+        {mode === "create" && (
+          <form onSubmit={handleCreate} className="bg-card space-y-4 rounded-xl p-6">
             <h2 className="text-xl font-bold">Create Workspace</h2>
             <div>
-              <label className="block text-sm text-silver mb-1">Workspace Name</label>
+              <label className="text-silver mb-1 block text-sm">Workspace Name</label>
               <input
                 type="text"
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 placeholder="e.g. Acme Corp"
-                className="w-full rounded-lg bg-background border border-card-hover px-4 py-2 focus:outline-none focus:border-accent"
+                className="bg-background border-card-hover focus:border-accent w-full rounded-lg border px-4 py-2 focus:outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-silver mb-1">Your Display Name</label>
+              <label className="text-silver mb-1 block text-sm">Your Display Name</label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Alex"
-                className="w-full rounded-lg bg-background border border-card-hover px-4 py-2 focus:outline-none focus:border-accent"
+                className="bg-background border-card-hover focus:border-accent w-full rounded-lg border px-4 py-2 focus:outline-none"
                 required
               />
             </div>
@@ -233,38 +240,45 @@ export default function LandingPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-accent px-4 py-3 font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="bg-accent hover:bg-accent-hover w-full rounded-lg px-4 py-3 font-bold text-white transition-colors disabled:opacity-50"
             >
-              {loading ? 'Creating...' : 'Create & Enter'}
+              {loading ? "Creating..." : "Create & Enter"}
             </button>
-            <button type="button" onClick={() => { setMode('choose'); setError(''); }} className="w-full text-sm text-silver hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("choose");
+                setError("");
+              }}
+              className="text-silver hover:text-foreground w-full text-sm"
+            >
               Back
             </button>
           </form>
         )}
 
-        {mode === 'join' && (
-          <form onSubmit={handleJoin} className="space-y-4 bg-card rounded-xl p-6">
+        {mode === "join" && (
+          <form onSubmit={handleJoin} className="bg-card space-y-4 rounded-xl p-6">
             <h2 className="text-xl font-bold">Join Workspace</h2>
             <div>
-              <label className="block text-sm text-silver mb-1">Invite Code</label>
+              <label className="text-silver mb-1 block text-sm">Invite Code</label>
               <input
                 type="text"
                 value={inviteCode}
                 onChange={(e) => setInviteCode(e.target.value)}
                 placeholder="e.g. a1b2c3d4e5f6"
-                className="w-full rounded-lg bg-background border border-card-hover px-4 py-2 font-mono focus:outline-none focus:border-accent"
+                className="bg-background border-card-hover focus:border-accent w-full rounded-lg border px-4 py-2 font-mono focus:outline-none"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm text-silver mb-1">Your Display Name</label>
+              <label className="text-silver mb-1 block text-sm">Your Display Name</label>
               <input
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Alex"
-                className="w-full rounded-lg bg-background border border-card-hover px-4 py-2 focus:outline-none focus:border-accent"
+                className="bg-background border-card-hover focus:border-accent w-full rounded-lg border px-4 py-2 focus:outline-none"
                 required
               />
             </div>
@@ -272,11 +286,18 @@ export default function LandingPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-accent px-4 py-3 font-bold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+              className="bg-accent hover:bg-accent-hover w-full rounded-lg px-4 py-3 font-bold text-white transition-colors disabled:opacity-50"
             >
-              {loading ? 'Joining...' : 'Join Workspace'}
+              {loading ? "Joining..." : "Join Workspace"}
             </button>
-            <button type="button" onClick={() => { setMode('choose'); setError(''); }} className="w-full text-sm text-silver hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("choose");
+                setError("");
+              }}
+              className="text-silver hover:text-foreground w-full text-sm"
+            >
               Back
             </button>
           </form>

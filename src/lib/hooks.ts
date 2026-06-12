@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { Member } from '@/lib/types';
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Member } from "@/lib/types";
 
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -18,7 +18,9 @@ export function useAuth() {
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id || null);
       setUserEmail(session?.user?.email || null);
     });
@@ -31,11 +33,10 @@ export function useAuth() {
 
 export function useMember(workspaceId: string, userId: string | null) {
   const [member, setMember] = useState<Member | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!!userId);
 
   useEffect(() => {
     if (!userId) {
-      setLoading(false);
       return;
     }
 
@@ -43,10 +44,10 @@ export function useMember(workspaceId: string, userId: string | null) {
 
     async function load() {
       const { data } = await supabase
-        .from('members')
-        .select('*')
-        .eq('workspace_id', workspaceId)
-        .eq('user_id', userId!)
+        .from("members")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", userId!)
         .single();
 
       setMember(data);
@@ -59,11 +60,11 @@ export function useMember(workspaceId: string, userId: string | null) {
     const channel = supabase
       .channel(`member-${userId}`)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'members',
+          event: "UPDATE",
+          schema: "public",
+          table: "members",
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
@@ -74,7 +75,9 @@ export function useMember(workspaceId: string, userId: string | null) {
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [workspaceId, userId]);
 
   return { member, loading };

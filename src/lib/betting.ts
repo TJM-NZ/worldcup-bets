@@ -1,4 +1,4 @@
-import { Prediction } from './types';
+import { Prediction } from "./types";
 
 interface BetForResolution {
   id: string;
@@ -20,12 +20,12 @@ interface PayoutResult {
  */
 export function winnerToPrediction(winner: string): Prediction | null {
   switch (winner) {
-    case 'HOME_TEAM':
-      return 'HOME';
-    case 'AWAY_TEAM':
-      return 'AWAY';
-    case 'DRAW':
-      return 'DRAW';
+    case "HOME_TEAM":
+      return "HOME";
+    case "AWAY_TEAM":
+      return "AWAY";
+    case "DRAW":
+      return "DRAW";
     default:
       return null;
   }
@@ -40,10 +40,7 @@ export function winnerToPrediction(winner: string): Prediction | null {
  * - Nobody bet on correct outcome → all wagers lost (gems_won = 0)
  * - Only one outcome had bets and it won → everyone gets wager back
  */
-export function calculatePayouts(
-  bets: BetForResolution[],
-  winner: Prediction
-): PayoutResult[] {
+export function calculatePayouts(bets: BetForResolution[], winner: Prediction): PayoutResult[] {
   if (bets.length === 0) return [];
 
   const pools: Record<Prediction, number> = { HOME: 0, AWAY: 0, DRAW: 0 };
@@ -80,7 +77,7 @@ export function calculatePayouts(
  * Bets lock when status changes from TIMED/SCHEDULED.
  */
 export function isBettingOpen(status: string): boolean {
-  return status === 'TIMED' || status === 'SCHEDULED';
+  return status === "TIMED" || status === "SCHEDULED";
 }
 
 /**
@@ -88,5 +85,5 @@ export function isBettingOpen(status: string): boolean {
  * Only available in group stage.
  */
 export function isDrawAvailable(stage: string): boolean {
-  return stage === 'GROUP_STAGE';
+  return stage === "GROUP_STAGE";
 }
