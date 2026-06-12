@@ -16,19 +16,19 @@ export default function SetupPage() {
   // Redirect if not logged in, or if already in a workspace
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getUser().then(async ({ data: { user }, error }) => {
+      if (error || !user) {
         window.location.href = "/login";
         return;
       }
 
-      setUserId(session.user.id);
+      setUserId(user.id);
 
       // Check if user already has a workspace
       const res = await fetch("/api/me", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.user.id }),
+        body: JSON.stringify({ userId: user.id }),
       });
       const { workspaceId } = await res.json();
 
