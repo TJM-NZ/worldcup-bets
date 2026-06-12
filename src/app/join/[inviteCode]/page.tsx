@@ -79,7 +79,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      router.push(`/workspace/${data.workspace.id}`);
+      window.location.href = `/workspace/${data.workspace.id}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join");
     } finally {
