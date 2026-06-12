@@ -1,16 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
+import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 
-export default function MatchesPage({ params }: { params: Promise<{ workspaceId: string }> }) {
-  const { workspaceId } = use(params);
-  const { userId } = useAuth();
-  const { member } = useMember(workspaceId, userId);
+export default function MatchesPage() {
+  const { workspace, member } = useWorkspace();
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
@@ -48,7 +45,6 @@ export default function MatchesPage({ params }: { params: Promise<{ workspaceId:
   }, []);
 
   useEffect(() => {
-    if (!member) return;
     const supabase = createClient();
     supabase
       .from("bets")
@@ -61,7 +57,7 @@ export default function MatchesPage({ params }: { params: Promise<{ workspaceId:
           setBets(map);
         }
       });
-  }, [member]);
+  }, [member.id]);
 
   const filtered = matches.filter((m) => {
     switch (filter) {
@@ -122,7 +118,7 @@ export default function MatchesPage({ params }: { params: Promise<{ workspaceId:
                 match={m}
                 homeTeam={teams.get(m.home_team_id!) || null}
                 awayTeam={teams.get(m.away_team_id!) || null}
-                workspaceId={workspaceId}
+                workspaceSlug={workspace.slug}
                 userBet={bets.get(m.id) || null}
               />
             ))}

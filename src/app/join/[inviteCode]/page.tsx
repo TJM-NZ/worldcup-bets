@@ -29,7 +29,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
       // Check if workspace exists
       const { data: workspace } = await supabase
         .from("workspaces")
-        .select("id, name")
+        .select("id, name, slug")
         .eq("invite_code", inviteCode)
         .single();
 
@@ -50,7 +50,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
         .single();
 
       if (member) {
-        router.push(`/workspace/${workspace.id}`);
+        router.push(`/workspace/${workspace.slug}`);
         return;
       }
 
@@ -79,7 +79,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      window.location.href = `/workspace/${data.workspace.id}`;
+      window.location.href = `/workspace/${data.workspace.slug}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join");
     } finally {

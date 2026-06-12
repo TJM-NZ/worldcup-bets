@@ -1,6 +1,7 @@
 export interface Workspace {
   id: string;
   name: string;
+  slug: string;
   invite_code: string;
   created_by: string;
   created_at: string;

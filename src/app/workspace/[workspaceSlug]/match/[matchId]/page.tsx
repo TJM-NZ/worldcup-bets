@@ -4,22 +4,17 @@ import { useEffect, useState } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
+import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import { isBettingOpen } from "@/lib/betting";
 import BetForm from "@/components/BetForm";
 import CountdownTimer from "@/components/CountdownTimer";
 import GemBadge from "@/components/GemBadge";
 
-export default function MatchDetailPage({
-  params,
-}: {
-  params: Promise<{ workspaceId: string; matchId: string }>;
-}) {
-  const { workspaceId, matchId } = use(params);
+export default function MatchDetailPage({ params }: { params: Promise<{ matchId: string }> }) {
+  const { matchId } = use(params);
   const router = useRouter();
-  const { userId } = useAuth();
-  const { member } = useMember(workspaceId, userId);
+  const { workspace, member } = useWorkspace();
   const [match, setMatch] = useState<Match | null>(null);
   const [homeTeam, setHomeTeam] = useState<Team | null>(null);
   const [awayTeam, setAwayTeam] = useState<Team | null>(null);
@@ -76,7 +71,6 @@ export default function MatchDetailPage({
 
   // Load bets
   useEffect(() => {
-    if (!member) return;
     const supabase = createClient();
     const matchIdNum = parseInt(matchId);
 
@@ -85,7 +79,7 @@ export default function MatchDetailPage({
       const { data: myBet } = await supabase
         .from("bets")
         .select("*")
-        .eq("member_id", member!.id)
+        .eq("member_id", member.id)
         .eq("match_id", matchIdNum)
         .single();
 
@@ -95,7 +89,7 @@ export default function MatchDetailPage({
       const { data: wsMembers } = await supabase
         .from("members")
         .select("id, display_name")
-        .eq("workspace_id", workspaceId);
+        .eq("workspace_id", workspace.id);
 
       if (wsMembers) {
         const memberIds = wsMembers.map((m) => m.id);
@@ -118,7 +112,7 @@ export default function MatchDetailPage({
     }
 
     loadBets();
-  }, [member, matchId, workspaceId]);
+  }, [member.id, matchId, workspace.id]);
 
   if (!match) {
     return (
@@ -215,7 +209,7 @@ export default function MatchDetailPage({
       </div>
 
       {/* Bet form or existing bet */}
-      {isOpen && !userBet && member && member.gems >= 10 && (
+      {isOpen && !userBet && member.gems >= 10 && (
         <div className="bg-card rounded-xl p-6">
           <h3 className="mb-4 text-lg font-bold">Place Your Bet</h3>
           <BetForm
@@ -229,7 +223,7 @@ export default function MatchDetailPage({
         </div>
       )}
 
-      {isOpen && !userBet && member && member.gems < 10 && (
+      {isOpen && !userBet && member.gems < 10 && (
         <div className="bg-card rounded-xl p-6 text-center">
           <p className="text-silver">You don&apos;t have enough gems to bet (minimum 10).</p>
         </div>

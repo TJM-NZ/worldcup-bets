@@ -22,11 +22,11 @@ export default function LandingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
       });
-      const { workspaceId } = await res.json();
+      const { workspaceSlug } = await res.json();
 
       setAuthState({
         status: "authenticated",
-        dashboardHref: workspaceId ? `/workspace/${workspaceId}` : "/setup",
+        dashboardHref: workspaceSlug ? `/workspace/${workspaceSlug}` : "/setup",
       });
     });
   }, []);

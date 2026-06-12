@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 export async function POST(request: Request) {
   const body = await request.json();
   const { workspaceName, displayName, userId } = body;
@@ -11,10 +18,11 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  // Create workspace
+  // Create workspace with slug
+  const slug = generateSlug(workspaceName);
   const { data: workspace, error: wsError } = await supabase
     .from("workspaces")
-    .insert({ name: workspaceName, created_by: userId })
+    .insert({ name: workspaceName, slug, created_by: userId })
     .select()
     .single();
 

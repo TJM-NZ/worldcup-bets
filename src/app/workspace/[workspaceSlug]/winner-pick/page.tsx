@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
+import { useWorkspace } from "@/lib/workspace-context";
 import { WinnerPick, Team } from "@/lib/types";
 import TeamPicker from "@/components/TeamPicker";
 
-export default function WinnerPickPage({ params }: { params: Promise<{ workspaceId: string }> }) {
-  const { workspaceId } = use(params);
-  const { userId } = useAuth();
-  const { member } = useMember(workspaceId, userId);
+export default function WinnerPickPage() {
+  const { member } = useWorkspace();
   const [pick, setPick] = useState<(WinnerPick & { team?: Team }) | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!member) return;
     const supabase = createClient();
 
     supabase
@@ -34,7 +30,7 @@ export default function WinnerPickPage({ params }: { params: Promise<{ workspace
         }
         setLoading(false);
       });
-  }, [member]);
+  }, [member.id]);
 
   if (loading) {
     return (
@@ -73,9 +69,9 @@ export default function WinnerPickPage({ params }: { params: Promise<{ workspace
             </div>
           </div>
         </div>
-      ) : member ? (
+      ) : (
         <TeamPicker memberId={member.id} onPicked={() => window.location.reload()} />
-      ) : null}
+      )}
     </div>
   );
 }

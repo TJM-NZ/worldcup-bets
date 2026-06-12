@@ -9,7 +9,7 @@ interface MatchCardProps {
   match: Match;
   homeTeam: Team | null;
   awayTeam: Team | null;
-  workspaceId: string;
+  workspaceSlug: string;
   userBet?: {
     prediction: string;
     gems_wagered: number;
@@ -63,7 +63,7 @@ export default function MatchCard({
   match,
   homeTeam,
   awayTeam,
-  workspaceId,
+  workspaceSlug,
   userBet,
 }: MatchCardProps) {
   const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
@@ -75,7 +75,7 @@ export default function MatchCard({
 
   return (
     <Link
-      href={`/workspace/${workspaceId}/match/${match.id}`}
+      href={`/workspace/${workspaceSlug}/match/${match.id}`}
       className={`hover:bg-card-hover block rounded-lg border p-4 transition-colors ${
         isLive ? "border-danger bg-card animate-pulse" : "border-card bg-card"
       }`}
