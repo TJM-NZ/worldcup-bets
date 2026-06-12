@@ -36,10 +36,10 @@ function LoginForm() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: data.user.id }),
         });
-        const { workspaceId } = await res.json();
+        const { workspaceSlug } = await res.json();
 
-        if (workspaceId) {
-          window.location.href = `/workspace/${workspaceId}`;
+        if (workspaceSlug) {
+          window.location.href = `/workspace/${workspaceSlug}`;
         } else {
           window.location.href = "/setup";
         }
