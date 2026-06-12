@@ -37,7 +37,7 @@ export default function LandingPage() {
         .limit(1);
 
       if (members && members.length > 0) {
-        router.push(`/workspace/${members[0].workspace_id}`);
+        window.location.href = `/workspace/${members[0].workspace_id}`;
         return;
       }
 

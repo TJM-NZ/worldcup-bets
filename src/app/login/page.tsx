@@ -28,7 +28,7 @@ function LoginForm() {
       if (authError) throw authError;
 
       if (redirect) {
-        router.push(redirect);
+        window.location.href = redirect;
       } else {
         // Look up user's workspace and redirect directly
         const { data: members } = await supabase
@@ -38,9 +38,9 @@ function LoginForm() {
           .limit(1);
 
         if (members && members.length > 0) {
-          router.push(`/workspace/${members[0].workspace_id}`);
+          window.location.href = `/workspace/${members[0].workspace_id}`;
         } else {
-          router.push("/");
+          window.location.href = "/";
         }
       }
     } catch (err) {
