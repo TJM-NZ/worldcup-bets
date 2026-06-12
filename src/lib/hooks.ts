@@ -34,6 +34,14 @@ export function useAuth() {
 export function useMember(workspaceId: string, userId: string | null) {
   const [member, setMember] = useState<Member | null>(null);
   const [loading, setLoading] = useState(!!userId);
+  const [prevKey, setPrevKey] = useState({ workspaceId, userId });
+
+  // Reset state when deps change (React-idiomatic, runs during render)
+  if (prevKey.workspaceId !== workspaceId || prevKey.userId !== userId) {
+    setPrevKey({ workspaceId, userId });
+    setMember(null);
+    setLoading(!!userId);
+  }
 
   useEffect(() => {
     if (!userId) {
