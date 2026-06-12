@@ -4,7 +4,7 @@ Office World Cup betting webapp. Virtual gems, parimutuel payouts, multi-tenant 
 
 ## Stack
 
-Next.js 16 (App Router, standalone) | Supabase (Postgres, anon auth, realtime, RLS) | Tailwind CSS | Vercel (hosting + cron)
+Next.js 16 (App Router, standalone) | Supabase (Postgres, email/password auth, realtime, RLS) | Tailwind CSS | Vercel (hosting + cron)
 
 ## Key Files
 
@@ -31,3 +31,17 @@ Feature branches: `feat/`, `fix/`, `refactor/`, `chore/` off `develop`, merged v
 Hotfixes: `hotfix/` off `main`, PR to `main`, sync back to `develop`
 
 Pre-commit (Husky): lint-staged (prettier + eslint) → tsc --noEmit
+
+## Supabase (Prod)
+
+Project: Office Betting | Ref: `fqmsaewpayxhitlqfnar` | Region: Oceania (Sydney)
+CLI linked: `supabase link --project-ref fqmsaewpayxhitlqfnar`
+
+**Push config changes to prod:**
+
+1. Edit `supabase/config.toml` locally
+2. `supabase config push` — diffs local vs remote, prompts to apply (use `--yes` to auto-confirm)
+3. Verify: re-run `supabase config push` — should report all sections "up to date"
+
+**Push schema changes to prod:**
+`supabase db push` — applies pending migrations from `supabase/migrations/`
