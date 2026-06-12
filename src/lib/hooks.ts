@@ -6,6 +6,7 @@ import { Member } from '@/lib/types';
 
 export function useAuth() {
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -13,17 +14,19 @@ export function useAuth() {
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUserId(session?.user?.id || null);
+      setUserEmail(session?.user?.email || null);
       setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserId(session?.user?.id || null);
+      setUserEmail(session?.user?.email || null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  return { userId, loading };
+  return { userId, userEmail, loading };
 }
 
 export function useMember(workspaceId: string, userId: string | null) {

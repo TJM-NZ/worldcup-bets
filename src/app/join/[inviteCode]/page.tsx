@@ -17,43 +17,49 @@ export default function JoinPage({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [checking, setChecking] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
 
-    // Check if workspace exists
-    supabase
-      .from('workspaces')
-      .select('id, name')
-      .eq('invite_code', inviteCode)
-      .single()
-      .then(async ({ data: workspace }) => {
-        if (!workspace) {
-          setError('Invalid invite code');
-          setChecking(false);
-          return;
-        }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) {
+        router.push(`/login?redirect=${encodeURIComponent(`/join/${inviteCode}`)}`);
+        return;
+      }
 
-        setWorkspaceName(workspace.name);
+      setUserId(session.user.id);
 
-        // Check if already a member
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          const { data: member } = await supabase
-            .from('members')
-            .select('id')
-            .eq('workspace_id', workspace.id)
-            .eq('user_id', session.user.id)
-            .single();
+      // Check if workspace exists
+      const { data: workspace } = await supabase
+        .from('workspaces')
+        .select('id, name')
+        .eq('invite_code', inviteCode)
+        .single();
 
-          if (member) {
-            router.push(`/workspace/${workspace.id}`);
-            return;
-          }
-        }
-
+      if (!workspace) {
+        setError('Invalid invite code');
         setChecking(false);
-      });
+        return;
+      }
+
+      setWorkspaceName(workspace.name);
+
+      // Check if already a member
+      const { data: member } = await supabase
+        .from('members')
+        .select('id')
+        .eq('workspace_id', workspace.id)
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (member) {
+        router.push(`/workspace/${workspace.id}`);
+        return;
+      }
+
+      setChecking(false);
+    });
   }, [inviteCode, router]);
 
   async function handleJoin(e: React.FormEvent) {
@@ -64,22 +70,13 @@ export default function JoinPage({
     setError('');
 
     try {
-      const supabase = createClient();
-
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { data, error: authError } = await supabase.auth.signInAnonymously();
-        if (authError) throw authError;
-        session = data.session;
-      }
-
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviteCode,
           displayName: displayName.trim(),
-          userId: session!.user.id,
+          userId: userId!,
         }),
       });
 

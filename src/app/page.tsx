@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LandingPage() {
@@ -12,24 +13,33 @@ export default function LandingPage() {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [authState, setAuthState] = useState<'loading' | 'unauthenticated' | 'no-workspace'>('loading');
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showInviteInput, setShowInviteInput] = useState(false);
+  const [heroInviteCode, setHeroInviteCode] = useState('');
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const { data: members } = await supabase
-          .from('members')
-          .select('workspace_id')
-          .eq('user_id', session.user.id)
-          .limit(1);
-
-        if (members && members.length > 0) {
-          router.push(`/workspace/${members[0].workspace_id}`);
-          return;
-        }
+      if (!session) {
+        setAuthState('unauthenticated');
+        return;
       }
-      setCheckingSession(false);
+
+      setUserId(session.user.id);
+
+      const { data: members } = await supabase
+        .from('members')
+        .select('workspace_id')
+        .eq('user_id', session.user.id)
+        .limit(1);
+
+      if (members && members.length > 0) {
+        router.push(`/workspace/${members[0].workspace_id}`);
+        return;
+      }
+
+      setAuthState('no-workspace');
     });
   }, [router]);
 
@@ -41,22 +51,13 @@ export default function LandingPage() {
     setError('');
 
     try {
-      const supabase = createClient();
-
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { data, error: authError } = await supabase.auth.signInAnonymously();
-        if (authError) throw authError;
-        session = data.session;
-      }
-
       const res = await fetch('/api/workspace', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceName: workspaceName.trim(),
           displayName: displayName.trim(),
-          userId: session!.user.id,
+          userId: userId!,
         }),
       });
 
@@ -79,22 +80,13 @@ export default function LandingPage() {
     setError('');
 
     try {
-      const supabase = createClient();
-
-      let { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        const { data, error: authError } = await supabase.auth.signInAnonymously();
-        if (authError) throw authError;
-        session = data.session;
-      }
-
       const res = await fetch('/api/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inviteCode: inviteCode.trim(),
           displayName: displayName.trim(),
-          userId: session!.user.id,
+          userId: userId!,
         }),
       });
 
@@ -109,7 +101,7 @@ export default function LandingPage() {
     }
   }
 
-  if (checkingSession) {
+  if (authState === 'loading') {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
@@ -117,12 +109,80 @@ export default function LandingPage() {
     );
   }
 
+  if (authState === 'unauthenticated') {
+    return (
+      <>
+        <header className="flex items-center justify-between px-6 py-4">
+          <span className="text-xl font-bold">
+            <span className="text-accent">Office</span>Bets
+          </span>
+          <Link href="/login" className="text-sm text-silver hover:text-foreground transition-colors">
+            Log in
+          </Link>
+        </header>
+        <main className="flex-1 flex items-center justify-center px-4">
+          <div className="w-full max-w-md space-y-8 text-center">
+            <div>
+              <h1 className="text-5xl font-bold mb-3">
+                <span className="text-accent">Office</span>Bets
+              </h1>
+              <h6 className="text-silver text-sm">brought to you by Naila&apos;s HR safe gambling</h6>
+            </div>
+            <div className="space-y-3">
+              <Link
+                href="/signup"
+                className="block w-full rounded-lg bg-accent px-4 py-4 font-bold text-white text-center transition-colors hover:bg-accent-hover"
+              >
+                Start Playing
+              </Link>
+              {!showInviteInput ? (
+                <button
+                  onClick={() => setShowInviteInput(true)}
+                  className="w-full rounded-lg border-2 border-card-hover px-4 py-4 font-bold transition-colors hover:border-accent hover:text-accent"
+                >
+                  Accept Invite
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={heroInviteCode}
+                    onChange={(e) => setHeroInviteCode(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && heroInviteCode.trim()) {
+                        router.push(`/join/${heroInviteCode.trim()}`);
+                      }
+                    }}
+                    placeholder="Invite code"
+                    className="flex-1 rounded-lg bg-background border border-card-hover px-4 py-3 font-mono focus:outline-none focus:border-accent"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      if (heroInviteCode.trim()) {
+                        router.push(`/join/${heroInviteCode.trim()}`);
+                      }
+                    }}
+                    className="rounded-lg bg-accent px-6 py-3 font-bold text-white transition-colors hover:bg-accent-hover"
+                  >
+                    Go
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Authenticated, no workspace
   return (
     <main className="flex-1 flex items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-2">
-            <span className="text-accent">World Cup</span> Bets
+            <span className="text-accent">Office</span>Bets
           </h1>
           <p className="text-silver">2026 Office Betting Pool</p>
           <p className="text-sm text-silver mt-1">Wager virtual gems on match outcomes</p>

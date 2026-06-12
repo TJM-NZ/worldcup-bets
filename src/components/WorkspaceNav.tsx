@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import GemBadge from './GemBadge';
 
 interface WorkspaceNavProps {
@@ -12,7 +13,14 @@ interface WorkspaceNavProps {
 
 export default function WorkspaceNav({ workspaceId, workspaceName, memberGems }: WorkspaceNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const base = `/workspace/${workspaceId}`;
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push('/login');
+  }
 
   const links = [
     { href: base, label: 'Dashboard' },
@@ -44,7 +52,15 @@ export default function WorkspaceNav({ workspaceId, workspaceName, memberGems }:
               </Link>
             ))}
           </div>
-          <GemBadge gems={memberGems} />
+          <div className="flex items-center gap-3">
+            <GemBadge gems={memberGems} />
+            <button
+              onClick={handleSignOut}
+              className="text-sm text-silver hover:text-foreground transition-colors"
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </nav>

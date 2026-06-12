@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "World Cup Bets 2026",
+  title: "OfficeBets",
   description: "Office World Cup betting pool - wager gems on match outcomes",
 };
 
