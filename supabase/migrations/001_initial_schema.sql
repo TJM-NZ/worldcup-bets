@@ -10,7 +10,7 @@ create extension if not exists pgcrypto with schema extensions;
 create table public.workspaces (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  invite_code text not null unique default encode(gen_random_bytes(6), 'hex'),
+  invite_code text not null unique default encode(extensions.gen_random_bytes(6), 'hex'),
   created_by uuid not null references auth.users(id),
   created_at timestamptz not null default now()
 );
