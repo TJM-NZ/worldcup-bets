@@ -1,19 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LandingPage() {
-  const router = useRouter();
-  const [ready, setReady] = useState(false);
+  const [authState, setAuthState] = useState<
+    { status: "loading" } | { status: "guest" } | { status: "authenticated"; dashboardHref: string }
+  >({ status: "loading" });
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user }, error }) => {
       if (error || !user) {
-        setReady(true);
+        setAuthState({ status: "guest" });
         return;
       }
 
@@ -24,21 +24,16 @@ export default function LandingPage() {
       });
       const { workspaceId } = await res.json();
 
-      if (workspaceId) {
-        router.replace(`/workspace/${workspaceId}`);
-      } else {
-        router.replace("/setup");
-      }
+      setAuthState({
+        status: "authenticated",
+        dashboardHref: workspaceId ? `/workspace/${workspaceId}` : "/setup",
+      });
     });
-  }, [router]);
+  }, []);
 
-  if (!ready) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="border-accent h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
-      </div>
-    );
-  }
+  const isLoading = authState.status === "loading";
+  const isAuthenticated = authState.status === "authenticated";
+  const dashboardHref = isAuthenticated ? authState.dashboardHref : "/setup";
 
   return (
     <>
@@ -46,9 +41,22 @@ export default function LandingPage() {
         <span className="text-xl font-bold">
           <span className="text-accent">Office</span>Bets
         </span>
-        <Link href="/login" className="text-silver hover:text-foreground text-sm transition-colors">
-          Log in
-        </Link>
+        {!isLoading &&
+          (isAuthenticated ? (
+            <Link
+              href={dashboardHref}
+              className="text-silver hover:text-foreground text-sm transition-colors"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="text-silver hover:text-foreground text-sm transition-colors"
+            >
+              Log in
+            </Link>
+          ))}
       </header>
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg space-y-10 text-center">
@@ -65,18 +73,33 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="mx-auto w-full max-w-sm space-y-3">
-            <Link
-              href="/signup"
-              className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
-            >
-              Start playing
-            </Link>
-            <Link
-              href="/login"
-              className="border-card-hover hover:border-accent hover:text-accent block w-full rounded-lg border-2 px-4 py-4 text-center font-bold transition-colors"
-            >
-              Log in
-            </Link>
+            {isLoading ? (
+              <div className="flex justify-center py-4">
+                <div className="border-accent h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
+              </div>
+            ) : isAuthenticated ? (
+              <Link
+                href={dashboardHref}
+                className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
+              >
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/signup"
+                  className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
+                >
+                  Start playing
+                </Link>
+                <Link
+                  href="/login"
+                  className="border-card-hover hover:border-accent hover:text-accent block w-full rounded-lg border-2 px-4 py-4 text-center font-bold transition-colors"
+                >
+                  Log in
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </main>
