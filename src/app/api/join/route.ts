@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   // Look up workspace by invite code
   const { data: workspace, error: wsError } = await supabase
     .from("workspaces")
-    .select("id, name")
+    .select("id, name, slug")
     .eq("invite_code", inviteCode)
     .single();
 

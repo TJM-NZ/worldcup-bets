@@ -1,36 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
-import { useAuth, useMember } from "@/lib/hooks";
+import { useAuth } from "@/lib/hooks";
+import { useWorkspace } from "@/lib/workspace-context";
 import { Member } from "@/lib/types";
 import GemBadge from "@/components/GemBadge";
 
-export default function MembersPage({ params }: { params: Promise<{ workspaceId: string }> }) {
-  const { workspaceId } = use(params);
+export default function MembersPage() {
   const { userId } = useAuth();
-  const { member: currentMember } = useMember(workspaceId, userId);
+  const { workspace, member: currentMember, isAdmin } = useWorkspace();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  const isAdmin = currentMember?.role === "admin";
-
   useEffect(() => {
-    fetch(`/api/workspace/${workspaceId}/members`)
+    fetch(`/api/workspace/${workspace.id}/members`)
       .then((r) => r.json())
       .then(({ members }) => {
         setMembers(members ?? []);
         setLoading(false);
       });
-  }, [workspaceId]);
+  }, [workspace.id]);
 
   async function toggleRole(target: Member) {
     if (!userId || !isAdmin) return;
     const newRole = target.role === "admin" ? "member" : "admin";
     setUpdating(target.id);
 
-    const res = await fetch(`/api/workspace/${workspaceId}/members`, {
+    const res = await fetch(`/api/workspace/${workspace.id}/members`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -74,7 +71,7 @@ export default function MembersPage({ params }: { params: Promise<{ workspaceId:
               <div>
                 <div className="flex items-center gap-2 font-medium">
                   {m.display_name}
-                  {m.id === currentMember?.id && <span className="text-silver text-xs">(you)</span>}
+                  {m.id === currentMember.id && <span className="text-silver text-xs">(you)</span>}
                 </div>
                 <div className="mt-0.5 text-xs">
                   <span

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 
-/** Returns the user's first workspace_id, or null if they have none.
+/** Returns the user's first workspace slug, or null if they have none.
  *  Uses service role to bypass RLS. */
 export async function POST(request: Request) {
   const { userId } = await request.json();
@@ -18,7 +18,18 @@ export async function POST(request: Request) {
     .eq("user_id", userId)
     .limit(1);
 
-  const workspaceId = members && members.length > 0 ? members[0].workspace_id : null;
+  if (!members || members.length === 0) {
+    return NextResponse.json({ workspaceId: null, workspaceSlug: null });
+  }
 
-  return NextResponse.json({ workspaceId });
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("slug")
+    .eq("id", members[0].workspace_id)
+    .single();
+
+  return NextResponse.json({
+    workspaceId: members[0].workspace_id,
+    workspaceSlug: workspace?.slug ?? null,
+  });
 }

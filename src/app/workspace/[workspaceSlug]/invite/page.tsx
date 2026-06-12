@@ -1,31 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { use } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
+import { useState } from "react";
+import { useWorkspace } from "@/lib/workspace-context";
 
-export default function InvitePage({ params }: { params: Promise<{ workspaceId: string }> }) {
-  const { workspaceId } = use(params);
-  const { userId } = useAuth();
-  const { member } = useMember(workspaceId, userId);
-  const [inviteCode, setInviteCode] = useState("");
+export default function InvitePage() {
+  const { workspace, isAdmin } = useWorkspace();
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    if (!member || member.role !== "admin") return;
-    const supabase = createClient();
-    supabase
-      .from("workspaces")
-      .select("invite_code")
-      .eq("id", workspaceId)
-      .single()
-      .then(({ data }) => {
-        if (data) setInviteCode(data.invite_code);
-      });
-  }, [workspaceId, member]);
-
-  if (member && member.role !== "admin") {
+  if (!isAdmin) {
     return (
       <div className="mx-auto max-w-lg">
         <p className="text-silver">Only workspace admins can view the invite link.</p>
@@ -33,6 +15,7 @@ export default function InvitePage({ params }: { params: Promise<{ workspaceId: 
     );
   }
 
+  const inviteCode = workspace.invite_code;
   const inviteUrl =
     typeof window !== "undefined" ? `${window.location.origin}/join/${inviteCode}` : "";
 

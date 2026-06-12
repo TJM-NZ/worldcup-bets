@@ -30,10 +30,10 @@ export default function SetupPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id }),
       });
-      const { workspaceId } = await res.json();
+      const { workspaceSlug } = await res.json();
 
-      if (workspaceId) {
-        window.location.href = `/workspace/${workspaceId}`;
+      if (workspaceSlug) {
+        window.location.href = `/workspace/${workspaceSlug}`;
         return;
       }
 
@@ -62,7 +62,7 @@ export default function SetupPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      window.location.href = `/workspace/${data.workspace.id}`;
+      window.location.href = `/workspace/${data.workspace.slug}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create workspace");
     } finally {
@@ -91,7 +91,7 @@ export default function SetupPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      window.location.href = `/workspace/${data.workspace.id}`;
+      window.location.href = `/workspace/${data.workspace.slug}`;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to join workspace");
     } finally {

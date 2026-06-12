@@ -1,23 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { use } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
-import { Match, Team, Bet, Workspace } from "@/lib/types";
+import { useWorkspace } from "@/lib/workspace-context";
+import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import Leaderboard from "@/components/Leaderboard";
 import GemBadge from "@/components/GemBadge";
 
-export default function WorkspaceDashboard({
-  params,
-}: {
-  params: Promise<{ workspaceId: string }>;
-}) {
-  const { workspaceId } = use(params);
-  const { userId } = useAuth();
-  const { member } = useMember(workspaceId, userId);
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+export default function WorkspaceDashboard() {
+  const { workspace, member } = useWorkspace();
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
@@ -27,19 +19,11 @@ export default function WorkspaceDashboard({
     const supabase = createClient();
 
     async function load() {
-      // Load workspace info
-      const { data: wsData } = await supabase
-        .from("workspaces")
-        .select("*")
-        .eq("id", workspaceId)
-        .single();
-      if (wsData) setWorkspace(wsData);
-
       // Load member count
       const { count } = await supabase
         .from("members")
         .select("*", { count: "exact", head: true })
-        .eq("workspace_id", workspaceId);
+        .eq("workspace_id", workspace.id);
       if (count !== null) setMemberCount(count);
 
       // Load upcoming & live matches
@@ -72,11 +56,10 @@ export default function WorkspaceDashboard({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [workspaceId]);
+  }, [workspace.id]);
 
   // Load user's bets
   useEffect(() => {
-    if (!member) return;
     const supabase = createClient();
 
     supabase
@@ -90,7 +73,7 @@ export default function WorkspaceDashboard({
           setBets(map);
         }
       });
-  }, [member]);
+  }, [member.id]);
 
   const liveMatches = matches.filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED");
   const upcoming = matches.filter((m) => m.status === "TIMED" || m.status === "SCHEDULED");
@@ -100,20 +83,16 @@ export default function WorkspaceDashboard({
       {/* Workspace header */}
       <div className="bg-card rounded-xl p-6">
         <h1 className="text-3xl font-bold">
-          <span className="text-accent">{workspace?.name ?? "..."}</span>
+          <span className="text-accent">{workspace.name}</span>
         </h1>
         <div className="text-silver mt-2 flex items-center gap-4 text-sm">
           <span>
             {memberCount} {memberCount === 1 ? "player" : "players"}
           </span>
-          {member && (
-            <>
-              <span className="text-card-hover">|</span>
-              <span className="flex items-center gap-1.5">
-                You: <GemBadge gems={member.gems} size="sm" />
-              </span>
-            </>
-          )}
+          <span className="text-card-hover">|</span>
+          <span className="flex items-center gap-1.5">
+            You: <GemBadge gems={member.gems} size="sm" />
+          </span>
         </div>
       </div>
 
@@ -127,7 +106,7 @@ export default function WorkspaceDashboard({
                 match={m}
                 homeTeam={teams.get(m.home_team_id!) || null}
                 awayTeam={teams.get(m.away_team_id!) || null}
-                workspaceId={workspaceId}
+                workspaceSlug={workspace.slug}
                 userBet={bets.get(m.id) || null}
               />
             ))}
@@ -145,7 +124,7 @@ export default function WorkspaceDashboard({
                 match={m}
                 homeTeam={teams.get(m.home_team_id!) || null}
                 awayTeam={teams.get(m.away_team_id!) || null}
-                workspaceId={workspaceId}
+                workspaceSlug={workspace.slug}
                 userBet={bets.get(m.id) || null}
               />
             ))}
@@ -159,7 +138,7 @@ export default function WorkspaceDashboard({
 
       <section>
         <h2 className="mb-3 text-xl font-bold">Leaderboard</h2>
-        <Leaderboard workspaceId={workspaceId} currentMemberId={member?.id} />
+        <Leaderboard workspaceId={workspace.id} currentMemberId={member.id} />
       </section>
     </div>
   );

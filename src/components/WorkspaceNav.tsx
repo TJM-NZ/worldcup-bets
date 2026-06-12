@@ -3,24 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/workspace-context";
 import GemBadge from "./GemBadge";
 
-interface WorkspaceNavProps {
-  workspaceId: string;
-  workspaceName: string;
-  memberGems: number;
-  isAdmin: boolean;
-}
-
-export default function WorkspaceNav({
-  workspaceId,
-  workspaceName,
-  memberGems,
-  isAdmin,
-}: WorkspaceNavProps) {
+export default function WorkspaceNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const base = `/workspace/${workspaceId}`;
+  const { workspace, member, isAdmin } = useWorkspace();
+  const base = `/workspace/${workspace.slug}`;
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -47,7 +37,7 @@ export default function WorkspaceNav({
         <div className="flex h-14 items-center justify-between">
           <div className="flex items-center gap-1">
             <Link href={base} className="text-accent mr-4 hidden font-bold sm:block">
-              {workspaceName}
+              {workspace.name}
             </Link>
             {links.map((link) => (
               <Link
@@ -64,7 +54,7 @@ export default function WorkspaceNav({
             ))}
           </div>
           <div className="flex items-center gap-3">
-            <GemBadge gems={memberGems} />
+            <GemBadge gems={member.gems} />
             <button
               onClick={handleSignOut}
               className="text-silver hover:text-foreground text-sm transition-colors"
