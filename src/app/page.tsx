@@ -11,8 +11,8 @@ export default function LandingPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getUser().then(async ({ data: { user }, error }) => {
+      if (error || !user) {
         setReady(true);
         return;
       }
@@ -20,7 +20,7 @@ export default function LandingPage() {
       const res = await fetch("/api/me", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.user.id }),
+        body: JSON.stringify({ userId: user.id }),
       });
       const { workspaceId } = await res.json();
 

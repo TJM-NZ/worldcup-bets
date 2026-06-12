@@ -18,13 +18,13 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getUser().then(async ({ data: { user }, error }) => {
+      if (error || !user) {
         router.push(`/login?redirect=${encodeURIComponent(`/join/${inviteCode}`)}`);
         return;
       }
 
-      setUserId(session.user.id);
+      setUserId(user.id);
 
       // Check if workspace exists
       const { data: workspace } = await supabase
@@ -46,7 +46,7 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
         .from("members")
         .select("id")
         .eq("workspace_id", workspace.id)
-        .eq("user_id", session.user.id)
+        .eq("user_id", user.id)
         .single();
 
       if (member) {

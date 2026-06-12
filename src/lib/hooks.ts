@@ -12,9 +12,14 @@ export function useAuth() {
   useEffect(() => {
     const supabase = createClient();
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserId(session?.user?.id || null);
-      setUserEmail(session?.user?.email || null);
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error || !user) {
+        setUserId(null);
+        setUserEmail(null);
+      } else {
+        setUserId(user.id);
+        setUserEmail(user.email || null);
+      }
       setLoading(false);
     });
 
