@@ -12,6 +12,7 @@ export interface Member {
   user_id: string;
   display_name: string;
   gems: number;
+  role: "admin" | "member";
   created_at: string;
 }
 
@@ -34,20 +35,20 @@ export interface Match {
   away_team_id: number | null;
   home_score: number | null;
   away_score: number | null;
-  winner: 'HOME_TEAM' | 'AWAY_TEAM' | 'DRAW' | null;
+  winner: "HOME_TEAM" | "AWAY_TEAM" | "DRAW" | null;
 }
 
 export type MatchStatus =
-  | 'TIMED'
-  | 'SCHEDULED'
-  | 'IN_PLAY'
-  | 'PAUSED'
-  | 'FINISHED'
-  | 'POSTPONED'
-  | 'CANCELLED'
-  | 'SUSPENDED';
+  | "TIMED"
+  | "SCHEDULED"
+  | "IN_PLAY"
+  | "PAUSED"
+  | "FINISHED"
+  | "POSTPONED"
+  | "CANCELLED"
+  | "SUSPENDED";
 
-export type Prediction = 'HOME' | 'AWAY' | 'DRAW';
+export type Prediction = "HOME" | "AWAY" | "DRAW";
 
 export interface Bet {
   id: string;
@@ -107,7 +108,7 @@ export interface MatchWithTeams extends Match {
 }
 
 export interface BetWithMember extends Bet {
-  member: Pick<Member, 'id' | 'display_name'>;
+  member: Pick<Member, "id" | "display_name">;
 }
 
 export interface LeaderboardEntry {

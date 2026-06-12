@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { useAuth, useMember } from '@/lib/hooks';
-import { Workspace } from '@/lib/types';
-import WorkspaceNav from '@/components/WorkspaceNav';
-import { use } from 'react';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { useAuth, useMember } from "@/lib/hooks";
+import { Workspace } from "@/lib/types";
+import WorkspaceNav from "@/components/WorkspaceNav";
+import { use } from "react";
 
 export default function WorkspaceLayout({
   children,
@@ -24,9 +24,9 @@ export default function WorkspaceLayout({
   useEffect(() => {
     const supabase = createClient();
     supabase
-      .from('workspaces')
-      .select('*')
-      .eq('id', workspaceId)
+      .from("workspaces")
+      .select("*")
+      .eq("id", workspaceId)
       .single()
       .then(({ data }) => {
         if (data) setWorkspace(data);
@@ -35,27 +35,28 @@ export default function WorkspaceLayout({
 
   if (authLoading || memberLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-accent border-t-transparent" />
+      <div className="flex flex-1 items-center justify-center">
+        <div className="border-accent h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
       </div>
     );
   }
 
   if (!userId || !member) {
-    router.push('/');
+    router.push("/");
     return null;
   }
 
+  const isAdmin = member.role === "admin";
+
   return (
-    <div className="flex flex-col flex-1">
+    <div className="flex flex-1 flex-col">
       <WorkspaceNav
         workspaceId={workspaceId}
-        workspaceName={workspace?.name || 'Loading...'}
+        workspaceName={workspace?.name || "Loading..."}
         memberGems={member.gems}
+        isAdmin={isAdmin}
       />
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">
-        {children}
-      </main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
     </div>
   );
 }
