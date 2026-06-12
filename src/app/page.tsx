@@ -179,28 +179,27 @@ export default function LandingPage() {
   // Authenticated, no workspace
   return (
     <main className="flex-1 flex items-center justify-center px-4">
-      <div className="w-full max-w-md space-y-8">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-2">
+      <div className="w-full max-w-md space-y-8 text-center">
+        <div>
+          <h1 className="text-5xl font-bold mb-3">
             <span className="text-accent">Office</span>Bets
           </h1>
-          <p className="text-silver">2026 Office Betting Pool</p>
-          <p className="text-sm text-silver mt-1">Wager virtual gems on match outcomes</p>
+          <h6 className="text-silver text-sm">brought to you by Naila&apos;s HR safe gambling</h6>
         </div>
 
         {mode === 'choose' && (
           <div className="space-y-3">
             <button
               onClick={() => setMode('create')}
-              className="w-full rounded-lg bg-accent px-4 py-4 font-bold text-white transition-colors hover:bg-accent-hover"
+              className="block w-full rounded-lg bg-accent px-4 py-4 font-bold text-white text-center transition-colors hover:bg-accent-hover"
             >
-              Create a Workspace
+              Start Playing
             </button>
             <button
               onClick={() => setMode('join')}
               className="w-full rounded-lg border-2 border-card-hover px-4 py-4 font-bold transition-colors hover:border-accent hover:text-accent"
             >
-              Join with Invite Code
+              Accept Invite
             </button>
           </div>
         )}
