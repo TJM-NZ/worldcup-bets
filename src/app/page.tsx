@@ -127,13 +127,16 @@ export default function LandingPage() {
         </header>
         <main className="flex flex-1 items-center justify-center px-4">
           <div className="w-full max-w-md space-y-8 text-center">
-            <div>
-              <h1 className="mb-3 text-5xl font-bold">
+            <div className="space-y-3">
+              <h1 className="text-6xl font-bold">
                 <span className="text-accent">Office</span>Bets
               </h1>
-              <h6 className="text-silver text-sm">
-                brought to you by Naila&apos;s HR safe gambling
-              </h6>
+              <p className="text-silver text-base">
+                Pick World Cup 2026 winners with virtual gems.
+              </p>
+              <p className="text-silver/50 text-xs tracking-widest uppercase">
+                Brought to you by Naila&apos;s HR Safe Gambling
+              </p>
             </div>
             <div className="space-y-3">
               <Link
@@ -187,11 +190,14 @@ export default function LandingPage() {
   return (
     <main className="flex flex-1 items-center justify-center px-4">
       <div className="w-full max-w-md space-y-8 text-center">
-        <div>
-          <h1 className="mb-3 text-5xl font-bold">
+        <div className="space-y-3">
+          <h1 className="text-6xl font-bold">
             <span className="text-accent">Office</span>Bets
           </h1>
-          <h6 className="text-silver text-sm">brought to you by Naila&apos;s HR safe gambling</h6>
+          <p className="text-silver text-base">Pick World Cup 2026 winners with virtual gems.</p>
+          <p className="text-silver/50 text-xs tracking-widest uppercase">
+            Brought to you by Naila&apos;s HR Safe Gambling
+          </p>
         </div>
 
         {mode === "choose" && (

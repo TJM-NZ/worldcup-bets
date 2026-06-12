@@ -21,7 +21,7 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -30,7 +30,18 @@ function LoginForm() {
       if (redirect) {
         router.push(redirect);
       } else {
-        router.push("/");
+        // Look up user's workspace and redirect directly
+        const { data: members } = await supabase
+          .from("members")
+          .select("workspace_id")
+          .eq("user_id", data.user.id)
+          .limit(1);
+
+        if (members && members.length > 0) {
+          router.push(`/workspace/${members[0].workspace_id}`);
+        } else {
+          router.push("/");
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
