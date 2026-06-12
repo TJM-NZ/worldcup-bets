@@ -30,17 +30,18 @@ function LoginForm() {
       if (redirect) {
         window.location.href = redirect;
       } else {
-        // Look up user's workspace and redirect directly
-        const { data: members } = await supabase
-          .from("members")
-          .select("workspace_id")
-          .eq("user_id", data.user.id)
-          .limit(1);
+        // Look up workspace via API (bypasses RLS)
+        const res = await fetch("/api/me", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: data.user.id }),
+        });
+        const { workspaceId } = await res.json();
 
-        if (members && members.length > 0) {
-          window.location.href = `/workspace/${members[0].workspace_id}`;
+        if (workspaceId) {
+          window.location.href = `/workspace/${workspaceId}`;
         } else {
-          window.location.href = "/";
+          window.location.href = "/setup";
         }
       }
     } catch (err) {

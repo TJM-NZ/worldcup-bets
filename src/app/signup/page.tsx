@@ -28,9 +28,9 @@ function SignupForm() {
       if (authError) throw authError;
 
       if (redirect) {
-        router.push(redirect);
+        window.location.href = redirect;
       } else {
-        router.push("/");
+        window.location.href = "/setup";
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign up");
