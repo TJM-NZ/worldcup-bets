@@ -6,8 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LandingPage() {
   const [ready, setReady] = useState(false);
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
 
-  // If already logged in, redirect to workspace or setup
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -15,6 +16,8 @@ export default function LandingPage() {
         setReady(true);
         return;
       }
+
+      setLoggedIn(true);
 
       const res = await fetch("/api/me", {
         method: "POST",
@@ -24,10 +27,9 @@ export default function LandingPage() {
       const { workspaceId } = await res.json();
 
       if (workspaceId) {
-        window.location.href = `/workspace/${workspaceId}`;
-      } else {
-        window.location.href = "/setup";
+        setWorkspaceId(workspaceId);
       }
+      setReady(true);
     });
   }, []);
 
@@ -45,9 +47,21 @@ export default function LandingPage() {
         <span className="text-xl font-bold">
           <span className="text-accent">Office</span>Bets
         </span>
-        <Link href="/login" className="text-silver hover:text-foreground text-sm transition-colors">
-          Log in
-        </Link>
+        {loggedIn ? (
+          <Link
+            href={workspaceId ? `/workspace/${workspaceId}` : "/setup"}
+            className="text-silver hover:text-foreground text-sm transition-colors"
+          >
+            {workspaceId ? "Go to dashboard" : "Set up workspace"}
+          </Link>
+        ) : (
+          <Link
+            href="/login"
+            className="text-silver hover:text-foreground text-sm transition-colors"
+          >
+            Log in
+          </Link>
+        )}
       </header>
       <main className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-lg space-y-10 text-center">
@@ -64,18 +78,29 @@ export default function LandingPage() {
             </p>
           </div>
           <div className="mx-auto w-full max-w-sm space-y-3">
-            <Link
-              href="/signup"
-              className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
-            >
-              Start playing
-            </Link>
-            <Link
-              href="/login"
-              className="border-card-hover hover:border-accent hover:text-accent block w-full rounded-lg border-2 px-4 py-4 text-center font-bold transition-colors"
-            >
-              Log in
-            </Link>
+            {loggedIn ? (
+              <Link
+                href={workspaceId ? `/workspace/${workspaceId}` : "/setup"}
+                className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
+              >
+                {workspaceId ? "Go to dashboard" : "Set up workspace"}
+              </Link>
+            ) : (
+              <>
+                <Link
+                  href="/signup"
+                  className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
+                >
+                  Start playing
+                </Link>
+                <Link
+                  href="/login"
+                  className="border-card-hover hover:border-accent hover:text-accent block w-full rounded-lg border-2 px-4 py-4 text-center font-bold transition-colors"
+                >
+                  Log in
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </main>
