@@ -72,7 +72,6 @@ export default function JoinPage({ params }: { params: Promise<{ inviteCode: str
         body: JSON.stringify({
           inviteCode,
           displayName: displayName.trim(),
-          userId: userId!,
         }),
       });
 

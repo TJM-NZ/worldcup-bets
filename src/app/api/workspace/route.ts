@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 function generateSlug(name: string): string {
   return name
@@ -9,20 +9,29 @@ function generateSlug(name: string): string {
 }
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { workspaceName, displayName, userId } = body;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!workspaceName || !displayName || !userId) {
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { workspaceName, displayName } = body;
+
+  if (!workspaceName || !displayName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const service = createServiceClient();
 
   // Create workspace with slug
   const slug = generateSlug(workspaceName);
-  const { data: workspace, error: wsError } = await supabase
+  const { data: workspace, error: wsError } = await service
     .from("workspaces")
-    .insert({ name: workspaceName, slug, created_by: userId })
+    .insert({ name: workspaceName, slug, created_by: user.id })
     .select()
     .single();
 
@@ -34,9 +43,9 @@ export async function POST(request: Request) {
   }
 
   // Create member as admin (workspace creator)
-  const { error: memberError } = await supabase.from("members").insert({
+  const { error: memberError } = await service.from("members").insert({
     workspace_id: workspace.id,
-    user_id: userId,
+    user_id: user.id,
     display_name: displayName,
     role: "admin",
   });
