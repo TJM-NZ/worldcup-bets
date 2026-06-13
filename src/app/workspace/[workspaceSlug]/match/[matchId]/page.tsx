@@ -5,8 +5,8 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import { Match, Team, Bet } from "@/lib/types";
-import { isBettingOpen } from "@/lib/betting";
+import { Match, Team, Bet, Prediction } from "@/lib/types";
+import { isBettingOpen, calculateOdds, isDrawAvailable } from "@/lib/betting";
 import BetForm from "@/components/BetForm";
 import CountdownTimer from "@/components/CountdownTimer";
 import GemBadge from "@/components/GemBadge";
@@ -69,7 +69,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
     };
   }, [matchId]);
 
-  // Load bets
+  // Load bets + subscribe to realtime changes
   useEffect(() => {
     const supabase = createClient();
     const matchIdNum = parseInt(matchId);
@@ -112,7 +112,20 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
     }
 
     loadBets();
-  }, [member.id, matchId, workspace.id]);
+
+    const channel = supabase
+      .channel(`bets-${matchIdNum}-${workspace.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "bets", filter: `match_id=eq.${matchIdNum}` },
+        () => loadBets()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [matchId, member.id, workspace.id]);
 
   if (!match) {
     return (
@@ -125,18 +138,15 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
   const isOpen = isBettingOpen(match.status) && new Date(match.utc_date) > new Date();
   const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
   const isFinished = match.status === "FINISHED";
+  const showDraw = isDrawAvailable(match.stage);
 
   // Pool summary
-  const poolHome = allBets
-    .filter((b) => b.prediction === "HOME")
-    .reduce((s, b) => s + b.gems_wagered, 0);
-  const poolAway = allBets
-    .filter((b) => b.prediction === "AWAY")
-    .reduce((s, b) => s + b.gems_wagered, 0);
-  const poolDraw = allBets
-    .filter((b) => b.prediction === "DRAW")
-    .reduce((s, b) => s + b.gems_wagered, 0);
-  const totalPool = poolHome + poolAway + poolDraw;
+  const pools: Record<Prediction, number> = { HOME: 0, AWAY: 0, DRAW: 0 };
+  for (const b of allBets) {
+    pools[b.prediction] += b.gems_wagered;
+  }
+  const totalPool = pools.HOME + pools.AWAY + pools.DRAW;
+  const odds = calculateOdds(pools);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -218,6 +228,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
             awayTeam={awayTeam}
             memberId={member.id}
             memberGems={member.gems}
+            pools={pools}
             onBetPlaced={() => window.location.reload()}
           />
         </div>
@@ -261,15 +272,15 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
       )}
 
       {/* Pool summary */}
-      {totalPool > 0 && (
-        <div className="bg-card rounded-xl p-6">
-          <h3 className="mb-3 text-lg font-bold">Betting Pool</h3>
+      <div className="bg-card rounded-xl p-6">
+        <h3 className="mb-3 text-lg font-bold">Betting Pool</h3>
+        {totalPool > 0 ? (
           <div className="space-y-2">
             {[
-              { label: homeTeam?.tla || "Home", pool: poolHome },
-              { label: awayTeam?.tla || "Away", pool: poolAway },
-              ...(poolDraw > 0 ? [{ label: "Draw", pool: poolDraw }] : []),
-            ].map(({ label, pool }) => (
+              { label: homeTeam?.tla || "Home", pool: pools.HOME, mult: odds.HOME },
+              { label: awayTeam?.tla || "Away", pool: pools.AWAY, mult: odds.AWAY },
+              ...(showDraw ? [{ label: "Draw", pool: pools.DRAW, mult: odds.DRAW }] : []),
+            ].map(({ label, pool, mult }) => (
               <div key={label} className="flex items-center gap-3">
                 <span className="text-silver w-16 text-sm">{label}</span>
                 <div className="bg-background h-4 flex-1 overflow-hidden rounded-full">
@@ -279,6 +290,9 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                   />
                 </div>
                 <GemBadge gems={pool} size="sm" />
+                <span className="text-silver w-12 text-right text-xs">
+                  {mult != null ? `${mult.toFixed(1)}x` : "—"}
+                </span>
               </div>
             ))}
             <p className="text-silver mt-2 text-sm">
@@ -286,8 +300,10 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
               {allBets.length !== 1 ? "s" : ""}
             </p>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-silver text-sm">No bets yet — be the first!</p>
+        )}
+      </div>
 
       {/* Individual bets (visible after match finished or if user already bet) */}
       {allBets.length > 0 && (isFinished || userBet) && (
