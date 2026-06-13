@@ -62,15 +62,23 @@ function buildStandings(matches: Match[], teams: Map<number, Team>): Map<string,
     home.gd = home.gf - home.ga;
     away.gd = away.gf - away.ga;
 
-    if (m.winner === "HOME_TEAM") {
+    const winner =
+      m.winner ??
+      (m.home_score > m.away_score
+        ? "HOME_TEAM"
+        : m.away_score > m.home_score
+          ? "AWAY_TEAM"
+          : "DRAW");
+
+    if (winner === "HOME_TEAM") {
       home.won++;
       home.points += 3;
       away.lost++;
-    } else if (m.winner === "AWAY_TEAM") {
+    } else if (winner === "AWAY_TEAM") {
       away.won++;
       away.points += 3;
       home.lost++;
-    } else if (m.winner === "DRAW") {
+    } else if (winner === "DRAW") {
       home.drawn++;
       home.points++;
       away.drawn++;
