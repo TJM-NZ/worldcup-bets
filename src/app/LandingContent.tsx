@@ -68,15 +68,14 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
                 FIFA World Cup 2026
               </p>
               <h1 className="text-4xl leading-tight font-bold tracking-tight">
-                A World Cup pool your
-                <br />
-                <span className="text-accent">HR team</span> won&apos;t hate
+                Not gambling.{" "}
+                <span className="text-accent">(Officially a team engagement activity.)</span>
               </h1>
             </div>
 
             <p className="text-silver mx-auto max-w-sm text-base leading-relaxed">
-              No spreadsheets, no cash, no awkward payment requests. Just picks, a leaderboard, and
-              bragging rights for the whole tournament.
+              No real money, no awkward payment requests, nothing HR needs to investigate. Just
+              picks, a leaderboard, and four weeks of office tension.
             </p>
 
             {/* Country flags */}
@@ -106,7 +105,7 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
                   href="/signup"
                   className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
                 >
-                  Start playing
+                  Join the initiative
                 </Link>
                 <Link
                   href="/login"
