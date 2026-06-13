@@ -184,15 +184,23 @@ function TourOverlay({
 
   // Tooltip positioning
   const tooltipW = Math.min(300, vw - 32);
-  let tooltipLeft = rect ? rect.left + rect.width / 2 - tooltipW / 2 : vw / 2 - tooltipW / 2;
+  const TOOLTIP_H = 220; // conservative estimate for clamping
+
+  // When element is very tall (leaderboard, etc.) or very wide, center on screen instead
+  const elementTooTall = rect && rect.height > vh * 0.5;
+  const elementTooWide = rect && rect.width > vw * 0.7;
+
+  let tooltipLeft =
+    rect && !elementTooWide ? rect.left + rect.width / 2 - tooltipW / 2 : vw / 2 - tooltipW / 2;
   tooltipLeft = Math.max(16, Math.min(tooltipLeft, vw - tooltipW - 16));
 
   const belowSpace = rect ? vh - (rect.top + rect.height + PAD) : 0;
-  const tooltipTop = rect
-    ? belowSpace > 200
-      ? rect.top + rect.height + PAD + 12
-      : rect.top - PAD - 12 - 180
-    : vh / 2 - 100;
+  const rawTop = (() => {
+    if (!rect || elementTooTall) return vh / 2 - TOOLTIP_H / 2;
+    if (belowSpace > 200) return rect.top + rect.height + PAD + 12;
+    return rect.top - PAD - 12 - TOOLTIP_H;
+  })();
+  const tooltipTop = Math.max(16, Math.min(rawTop, vh - TOOLTIP_H - 16));
 
   return (
     <div className="fixed inset-0 z-50" style={{ pointerEvents: "all" }}>
@@ -237,7 +245,7 @@ function TourOverlay({
       ) : (
         <div
           className="bg-card border-accent/60 fixed z-[51] rounded-2xl border-2 p-5 shadow-2xl"
-          style={{ width: tooltipW, left: tooltipLeft, top: Math.max(16, tooltipTop) }}
+          style={{ width: tooltipW, left: tooltipLeft, top: tooltipTop }}
         >
           <TourTooltipContent
             title={current.title}
