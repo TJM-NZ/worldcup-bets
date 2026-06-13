@@ -1,58 +1,46 @@
-"use client";
+import { redirect } from "next/navigation";
+import { requireAuth } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
+import WorkspaceShell from "./WorkspaceShell";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useAuth, useMember } from "@/lib/hooks";
-import { Workspace } from "@/lib/types";
-import { WorkspaceProvider } from "@/lib/workspace-context";
-import WorkspaceNav from "@/components/WorkspaceNav";
-import { use } from "react";
-
-export default function WorkspaceLayout({
+export default async function WorkspaceLayout({
   children,
   params,
 }: {
   children: React.ReactNode;
   params: Promise<{ workspaceSlug: string }>;
 }) {
-  const { workspaceSlug } = use(params);
-  const router = useRouter();
-  const { userId, loading: authLoading } = useAuth();
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const { member, loading: memberLoading } = useMember(workspace?.id ?? "", userId);
+  const { workspaceSlug } = await params;
+  const user = await requireAuth();
 
-  useEffect(() => {
-    const supabase = createClient();
-    supabase
-      .from("workspaces")
-      .select("*")
-      .eq("slug", workspaceSlug)
-      .single()
-      .then(({ data }) => {
-        if (data) setWorkspace(data);
-      });
-  }, [workspaceSlug]);
+  const supabase = createServiceClient();
 
-  if (authLoading || !workspace || memberLoading) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <div className="border-accent h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
-      </div>
-    );
+  // Load workspace by slug
+  const { data: workspace } = await supabase
+    .from("workspaces")
+    .select("*")
+    .eq("slug", workspaceSlug)
+    .single();
+
+  if (!workspace) {
+    redirect("/setup");
   }
 
-  if (!userId || !member) {
-    router.push("/");
-    return null;
+  // Load member
+  const { data: member } = await supabase
+    .from("members")
+    .select("*")
+    .eq("workspace_id", workspace.id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!member) {
+    redirect("/setup");
   }
 
   return (
-    <WorkspaceProvider workspace={workspace} member={member}>
-      <div className="flex flex-1 flex-col">
-        <WorkspaceNav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
-      </div>
-    </WorkspaceProvider>
+    <WorkspaceShell workspace={workspace} member={member}>
+      {children}
+    </WorkspaceShell>
   );
 }

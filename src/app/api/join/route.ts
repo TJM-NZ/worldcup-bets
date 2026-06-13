@@ -1,18 +1,27 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { inviteCode, displayName, userId } = body;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!inviteCode || !displayName || !userId) {
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json();
+  const { inviteCode, displayName } = body;
+
+  if (!inviteCode || !displayName) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const service = createServiceClient();
 
   // Look up workspace by invite code
-  const { data: workspace, error: wsError } = await supabase
+  const { data: workspace, error: wsError } = await service
     .from("workspaces")
     .select("id, name, slug")
     .eq("invite_code", inviteCode)
@@ -23,11 +32,11 @@ export async function POST(request: Request) {
   }
 
   // Check if already a member
-  const { data: existingMember } = await supabase
+  const { data: existingMember } = await service
     .from("members")
     .select("id")
     .eq("workspace_id", workspace.id)
-    .eq("user_id", userId)
+    .eq("user_id", user.id)
     .single();
 
   if (existingMember) {
@@ -35,9 +44,9 @@ export async function POST(request: Request) {
   }
 
   // Create member
-  const { error: memberError } = await supabase.from("members").insert({
+  const { error: memberError } = await service.from("members").insert({
     workspace_id: workspace.id,
-    user_id: userId,
+    user_id: user.id,
     display_name: displayName,
   });
 

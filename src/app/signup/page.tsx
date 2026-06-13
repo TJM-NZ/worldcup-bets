@@ -1,12 +1,11 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 function SignupForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");

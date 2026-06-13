@@ -1,12 +1,11 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect");
   const [email, setEmail] = useState("");
@@ -21,29 +20,13 @@ function LoginForm() {
 
     try {
       const supabase = createClient();
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
+      const { error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
       if (authError) throw authError;
 
-      if (redirect) {
-        window.location.href = redirect;
-      } else {
-        // Look up workspace via API (bypasses RLS)
-        const res = await fetch("/api/me", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: data.user.id }),
-        });
-        const { workspaceSlug } = await res.json();
-
-        if (workspaceSlug) {
-          window.location.href = `/workspace/${workspaceSlug}`;
-        } else {
-          window.location.href = "/setup";
-        }
-      }
+      window.location.href = redirect || "/setup";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
     } finally {
