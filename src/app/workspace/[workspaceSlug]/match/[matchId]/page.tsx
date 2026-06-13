@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +28,10 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
   const [allBets, setAllBets] = useState<Array<Bet & { member: { display_name: string } }>>([]);
   const [userScoreBet, setUserScoreBet] = useState<ExactScoreBet | null>(null);
   const [allScoreBets, setAllScoreBets] = useState<ExactScoreBetWithMember[]>([]);
+  const [fadeKey, setFadeKey] = useState(0);
+  const [fadePrediction, setFadePrediction] = useState<Prediction | null>(null);
+  const [fadeGems, setFadeGems] = useState<number | null>(null);
+  const betFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -265,9 +269,21 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
 
       {/* Bet form or existing bet */}
       {isOpen && !userBet && member.gems >= 10 && (
-        <div className="bg-card rounded-xl p-6">
-          <h3 className="mb-4 text-lg font-bold">Place Your Bet</h3>
+        <div ref={betFormRef} className="bg-card rounded-xl p-6">
+          <h3 className="mb-4 text-lg font-bold">
+            {fadePrediction ? (
+              <>
+                Fading{" "}
+                <span className="text-accent">
+                  {fadePrediction === "HOME" ? homeTeam?.tla || "Home" : awayTeam?.tla || "Away"}
+                </span>
+              </>
+            ) : (
+              "Place Your Bet"
+            )}
+          </h3>
           <BetForm
+            key={fadeKey}
             match={match}
             homeTeam={homeTeam}
             awayTeam={awayTeam}
@@ -275,6 +291,8 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
             memberGems={member.gems}
             pools={pools}
             onBetPlaced={() => window.location.reload()}
+            initialPrediction={fadePrediction ?? undefined}
+            initialGems={fadeGems ?? undefined}
           />
         </div>
       )}
@@ -421,34 +439,56 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
         )}
       </div>
 
-      {/* Individual bets (visible after match finished or if user already bet) */}
-      {allBets.length > 0 && (isFinished || userBet) && (
+      {/* Individual bets */}
+      {allBets.length > 0 && (
         <div className="bg-card rounded-xl p-6">
           <h3 className="mb-3 text-lg font-bold">All Bets</h3>
           <div className="space-y-2">
-            {allBets.map((bet) => (
-              <div
-                key={bet.id}
-                className="border-card-hover flex items-center justify-between border-b py-1.5 text-sm last:border-0"
-              >
-                <span className="font-medium">{bet.member.display_name}</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-silver">
-                    {bet.prediction === "HOME"
-                      ? homeTeam?.tla
-                      : bet.prediction === "AWAY"
-                        ? awayTeam?.tla
-                        : "Draw"}
-                  </span>
-                  <GemBadge gems={bet.gems_wagered} size="sm" />
-                  {bet.resolved && (
-                    <span className={bet.gems_won > 0 ? "text-success" : "text-danger"}>
-                      {bet.gems_won > 0 ? `+${bet.gems_won}` : "Lost"}
+            {allBets.map((bet) => {
+              const canFade = isOpen && !userBet && bet.prediction !== "DRAW";
+              const opposite: Prediction | null =
+                bet.prediction === "HOME" ? "AWAY" : bet.prediction === "AWAY" ? "HOME" : null;
+              return (
+                <div
+                  key={bet.id}
+                  className="border-card-hover flex items-center justify-between border-b py-1.5 text-sm last:border-0"
+                >
+                  <span className="font-medium">{bet.member.display_name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-silver">
+                      {bet.prediction === "HOME"
+                        ? homeTeam?.tla
+                        : bet.prediction === "AWAY"
+                          ? awayTeam?.tla
+                          : "Draw"}
                     </span>
-                  )}
+                    <GemBadge gems={bet.gems_wagered} size="sm" />
+                    {bet.resolved && (
+                      <span className={bet.gems_won > 0 ? "text-success" : "text-danger"}>
+                        {bet.gems_won > 0 ? `+${bet.gems_won}` : "Lost"}
+                      </span>
+                    )}
+                    {canFade && opposite && (
+                      <button
+                        onClick={() => {
+                          setFadePrediction(opposite);
+                          setFadeGems(Math.min(bet.gems_wagered, member.gems));
+                          setFadeKey((k) => k + 1);
+                          betFormRef.current?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          });
+                        }}
+                        className="text-silver hover:text-accent ml-1 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-white/5"
+                        title={`Fade ${bet.member.display_name} — bet ${opposite} for ${Math.min(bet.gems_wagered, member.gems)} gems`}
+                      >
+                        Fade
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

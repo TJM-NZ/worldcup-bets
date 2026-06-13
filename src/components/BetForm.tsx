@@ -13,6 +13,8 @@ interface BetFormProps {
   memberGems: number;
   pools: Record<Prediction, number>;
   onBetPlaced: () => void;
+  initialPrediction?: Prediction;
+  initialGems?: number;
 }
 
 export default function BetForm({
@@ -23,9 +25,11 @@ export default function BetForm({
   memberGems,
   pools,
   onBetPlaced,
+  initialPrediction,
+  initialGems,
 }: BetFormProps) {
-  const [prediction, setPrediction] = useState<Prediction | null>(null);
-  const [gems, setGems] = useState(50);
+  const [prediction, setPrediction] = useState<Prediction | null>(initialPrediction ?? null);
+  const [gems, setGems] = useState(initialGems ?? 50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
