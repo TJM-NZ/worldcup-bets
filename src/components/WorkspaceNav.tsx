@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import GemBadge from "./GemBadge";
+import { useTour } from "./Tour";
 
 function HomeIcon({ className }: { className?: string }) {
   return (
@@ -121,6 +122,7 @@ function WorkspaceSwitcher({
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { startTour } = useTour();
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -196,6 +198,15 @@ function WorkspaceSwitcher({
                 + Create or Join
               </Link>
               <div className="border-card-hover border-t">
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    startTour();
+                  }}
+                  className="text-silver hover:bg-accent/10 hover:text-foreground w-full px-4 py-2 text-left text-sm transition-colors"
+                >
+                  Take the tour
+                </button>
                 <button
                   onClick={() => {
                     setOpen(false);
