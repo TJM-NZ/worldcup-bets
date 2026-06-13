@@ -62,6 +62,18 @@ export interface Bet {
   created_at: string;
 }
 
+export interface ExactScoreBet {
+  id: string;
+  member_id: string;
+  match_id: number;
+  predicted_home: number;
+  predicted_away: number;
+  gems_wagered: number;
+  gems_won: number;
+  resolved: boolean;
+  created_at: string;
+}
+
 export interface WinnerPick {
   id: string;
   member_id: string;
@@ -109,6 +121,10 @@ export interface MatchWithTeams extends Match {
 }
 
 export interface BetWithMember extends Bet {
+  member: Pick<Member, "id" | "display_name">;
+}
+
+export interface ExactScoreBetWithMember extends ExactScoreBet {
   member: Pick<Member, "id" | "display_name">;
 }
 

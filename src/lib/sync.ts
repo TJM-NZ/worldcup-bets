@@ -1,6 +1,6 @@
 import { createServiceClient } from "./supabase/server";
 import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
-import { calculatePayouts, winnerToPrediction } from "./betting";
+import { calculatePayouts, calculateExactScorePayout, winnerToPrediction } from "./betting";
 import { FdMatch } from "./types";
 
 /** Seed teams from football-data.org */
@@ -69,9 +69,14 @@ export async function syncMatches(): Promise<{
 
   if (upsertError) throw new Error(`Match sync failed: ${upsertError.message}`);
 
-  // Find newly finished matches
+  // Find newly finished matches (need winner AND scores for exact score resolution)
   const newlyFinished = apiMatches.filter(
-    (m) => m.status === "FINISHED" && existingStatusMap.get(m.id) !== "FINISHED" && m.score.winner
+    (m) =>
+      m.status === "FINISHED" &&
+      existingStatusMap.get(m.id) !== "FINISHED" &&
+      m.score.winner &&
+      m.score.fullTime.home !== null &&
+      m.score.fullTime.away !== null
   );
 
   // Find newly postponed/cancelled matches (for refunds)
@@ -86,7 +91,12 @@ export async function syncMatches(): Promise<{
 
   // Resolve finished matches
   for (const match of newlyFinished) {
-    betsResolved += await resolveMatch(match.id, match.score.winner!);
+    betsResolved += await resolveMatch(
+      match.id,
+      match.score.winner!,
+      match.score.fullTime.home!,
+      match.score.fullTime.away!
+    );
   }
 
   // Refund cancelled/postponed
@@ -98,7 +108,12 @@ export async function syncMatches(): Promise<{
 }
 
 /** Resolve bets for a finished match using parimutuel payout */
-async function resolveMatch(matchId: number, winnerRaw: string): Promise<number> {
+async function resolveMatch(
+  matchId: number,
+  winnerRaw: string,
+  homeScore: number,
+  awayScore: number
+): Promise<number> {
   const winner = winnerToPrediction(winnerRaw);
   if (!winner) return 0;
 
@@ -170,33 +185,74 @@ async function resolveMatch(matchId: number, winnerRaw: string): Promise<number>
     }
   }
 
+  // Resolve exact score bets (fixed 5x odds)
+  const { data: scoreBets } = await supabase
+    .from("exact_score_bets")
+    .select("id, member_id, predicted_home, predicted_away, gems_wagered")
+    .eq("match_id", matchId)
+    .eq("resolved", false);
+
+  for (const bet of scoreBets || []) {
+    const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
+    const gems_won = correct ? calculateExactScorePayout(bet.gems_wagered) : 0;
+
+    await supabase.from("exact_score_bets").update({ resolved: true, gems_won }).eq("id", bet.id);
+
+    if (gems_won > 0) {
+      await supabase.rpc("increment_gems", {
+        p_member_id: bet.member_id,
+        p_amount: gems_won,
+      });
+    }
+
+    totalResolved++;
+  }
+
   return totalResolved;
 }
 
 /** Refund all bets on a postponed/cancelled match */
 async function refundMatch(matchId: number): Promise<number> {
   const supabase = createServiceClient();
+  let total = 0;
+
   const { data: bets } = await supabase
     .from("bets")
     .select("id, member_id, gems_wagered")
     .eq("match_id", matchId)
     .eq("resolved", false);
 
-  if (!bets || bets.length === 0) return 0;
-
-  for (const bet of bets) {
+  for (const bet of bets || []) {
     await supabase
       .from("bets")
       .update({ resolved: true, gems_won: bet.gems_wagered })
       .eq("id", bet.id);
-
     await supabase.rpc("increment_gems", {
       p_member_id: bet.member_id,
       p_amount: bet.gems_wagered,
     });
+    total++;
   }
 
-  return bets.length;
+  const { data: scoreBets } = await supabase
+    .from("exact_score_bets")
+    .select("id, member_id, gems_wagered")
+    .eq("match_id", matchId)
+    .eq("resolved", false);
+
+  for (const bet of scoreBets || []) {
+    await supabase
+      .from("exact_score_bets")
+      .update({ resolved: true, gems_won: bet.gems_wagered })
+      .eq("id", bet.id);
+    await supabase.rpc("increment_gems", {
+      p_member_id: bet.member_id,
+      p_amount: bet.gems_wagered,
+    });
+    total++;
+  }
+
+  return total;
 }
 
 /** Determine if we should actually call the football-data API based on schedule */

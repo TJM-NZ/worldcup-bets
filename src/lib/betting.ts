@@ -1,5 +1,11 @@
 import { Prediction } from "./types";
 
+export const EXACT_SCORE_MULTIPLIER = 5;
+
+export function calculateExactScorePayout(gemsWagered: number): number {
+  return gemsWagered * EXACT_SCORE_MULTIPLIER;
+}
+
 interface BetForResolution {
   id: string;
   member_id: string;
