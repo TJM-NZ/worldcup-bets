@@ -108,7 +108,15 @@ interface WorkspaceItem {
   slug: string;
 }
 
-function WorkspaceSwitcher({ currentSlug }: { currentSlug: string }) {
+function WorkspaceSwitcher({
+  currentSlug,
+  isAdmin,
+  onSignOut,
+}: {
+  currentSlug: string;
+  isAdmin: boolean;
+  onSignOut: () => void;
+}) {
   const [open, setOpen] = useState(false);
   const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -169,6 +177,17 @@ function WorkspaceSwitcher({ currentSlug }: { currentSlug: string }) {
                   ))}
                 </div>
               )}
+              {isAdmin && (
+                <div className="border-card-hover border-b py-1">
+                  <Link
+                    href={`/workspace/${currentSlug}/manage`}
+                    onClick={() => setOpen(false)}
+                    className="text-foreground hover:bg-accent/10 block px-4 py-2 text-sm transition-colors"
+                  >
+                    Manage workspace
+                  </Link>
+                </div>
+              )}
               <Link
                 href="/setup"
                 onClick={() => setOpen(false)}
@@ -176,6 +195,17 @@ function WorkspaceSwitcher({ currentSlug }: { currentSlug: string }) {
               >
                 + Create or Join
               </Link>
+              <div className="border-card-hover border-t">
+                <button
+                  onClick={() => {
+                    setOpen(false);
+                    onSignOut();
+                  }}
+                  className="text-silver hover:bg-accent/10 hover:text-foreground w-full px-4 py-2 text-left text-sm transition-colors"
+                >
+                  Sign out
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -201,12 +231,7 @@ export default function WorkspaceNav() {
     { href: `${base}/matches`, label: "Matches" },
     { href: `${base}/leaderboard`, label: "Leaderboard" },
     { href: `${base}/winner-pick`, label: "Winner Pick" },
-    ...(isAdmin
-      ? [
-          { href: `${base}/members`, label: "Members" },
-          { href: `${base}/invite`, label: "Invite" },
-        ]
-      : []),
+    ...(isAdmin ? [{ href: `${base}/manage`, label: "Manage" }] : []),
   ];
 
   function isActive(tabKey: string) {
@@ -223,7 +248,11 @@ export default function WorkspaceNav() {
           <div className="flex h-14 items-center justify-between">
             <div className="flex items-center gap-1">
               <div className="mr-4">
-                <WorkspaceSwitcher currentSlug={workspace.slug} />
+                <WorkspaceSwitcher
+                  currentSlug={workspace.slug}
+                  isAdmin={isAdmin}
+                  onSignOut={handleSignOut}
+                />
               </div>
               {links.map((link) => (
                 <Link
@@ -244,12 +273,6 @@ export default function WorkspaceNav() {
               <span data-tour="gem-balance">
                 <GemBadge gems={member.gems} />
               </span>
-              <button
-                onClick={handleSignOut}
-                className="text-silver hover:text-foreground text-sm transition-colors"
-              >
-                Sign out
-              </button>
             </div>
           </div>
         </div>
@@ -258,7 +281,11 @@ export default function WorkspaceNav() {
       {/* Mobile top bar — name + gems only */}
       <nav className="border-card bg-card/50 sticky top-0 z-10 border-b backdrop-blur-sm sm:hidden">
         <div className="flex h-12 items-center justify-between px-4">
-          <WorkspaceSwitcher currentSlug={workspace.slug} />
+          <WorkspaceSwitcher
+            currentSlug={workspace.slug}
+            isAdmin={isAdmin}
+            onSignOut={handleSignOut}
+          />
           <span data-tour="gem-balance">
             <GemBadge gems={member.gems} />
           </span>
