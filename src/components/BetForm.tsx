@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Match, Team, Prediction } from "@/lib/types";
-import { isDrawAvailable } from "@/lib/betting";
+import { isDrawAvailable, calculateOdds } from "@/lib/betting";
 import GemBadge from "./GemBadge";
 
 interface BetFormProps {
@@ -11,6 +11,7 @@ interface BetFormProps {
   awayTeam: Team | null;
   memberId: string;
   memberGems: number;
+  pools: Record<Prediction, number>;
   onBetPlaced: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function BetForm({
   awayTeam,
   memberId,
   memberGems,
+  pools,
   onBetPlaced,
 }: BetFormProps) {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
@@ -29,6 +31,13 @@ export default function BetForm({
 
   const showDraw = isDrawAvailable(match.stage);
   const maxGems = memberGems;
+
+  // Calculate odds from current pools, and preview odds including user's wager
+  const currentOdds = calculateOdds(pools);
+  const previewPools: Record<Prediction, number> = prediction
+    ? { ...pools, [prediction]: pools[prediction] + gems }
+    : pools;
+  const previewOdds = prediction ? calculateOdds(previewPools) : currentOdds;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +81,11 @@ export default function BetForm({
     options.push({ value: "DRAW", label: "Draw" });
   }
 
+  const potentialPayout =
+    prediction && previewOdds[prediction] != null
+      ? Math.floor(gems * previewOdds[prediction])
+      : null;
+
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="flex items-center justify-between">
@@ -83,20 +97,26 @@ export default function BetForm({
         className="grid gap-2"
         style={{ gridTemplateColumns: showDraw ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}
       >
-        {options.map((opt) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => setPrediction(opt.value)}
-            className={`rounded-lg border-2 p-3 text-center font-semibold transition-colors ${
-              prediction === opt.value
-                ? "border-accent bg-accent/20 text-accent"
-                : "border-card-hover bg-card hover:border-silver"
-            }`}
-          >
-            {opt.label}
-          </button>
-        ))}
+        {options.map((opt) => {
+          const mult = currentOdds[opt.value];
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setPrediction(opt.value)}
+              className={`rounded-lg border-2 p-3 text-center transition-colors ${
+                prediction === opt.value
+                  ? "border-accent bg-accent/20 text-accent"
+                  : "border-card-hover bg-card hover:border-silver"
+              }`}
+            >
+              <span className="font-semibold">{opt.label}</span>
+              {mult != null && (
+                <span className="text-silver mt-0.5 block text-xs">{mult.toFixed(1)}x</span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div>
@@ -116,6 +136,13 @@ export default function BetForm({
           <span>{maxGems}</span>
         </div>
       </div>
+
+      {prediction && potentialPayout != null && (
+        <div className="bg-background flex items-center justify-between rounded-lg px-3 py-2 text-sm">
+          <span className="text-silver">Potential payout</span>
+          <GemBadge gems={potentialPayout} size="sm" />
+        </div>
+      )}
 
       {error && <p className="text-danger text-sm">{error}</p>}
 

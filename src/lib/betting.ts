@@ -73,6 +73,26 @@ export function calculatePayouts(bets: BetForResolution[], winner: Prediction): 
 }
 
 /**
+ * Calculate implied parimutuel multipliers from pool data.
+ * Multiplier = totalPool / outcomePool (e.g., 300 total, 100 on HOME → 3.0x)
+ */
+export function calculateOdds(
+  pools: Record<Prediction, number>
+): Record<Prediction, number | null> {
+  const total = pools.HOME + pools.AWAY + pools.DRAW;
+
+  if (total === 0) {
+    return { HOME: null, AWAY: null, DRAW: null };
+  }
+
+  return {
+    HOME: pools.HOME > 0 ? total / pools.HOME : null,
+    AWAY: pools.AWAY > 0 ? total / pools.AWAY : null,
+    DRAW: pools.DRAW > 0 ? total / pools.DRAW : null,
+  };
+}
+
+/**
  * Check if a match is still open for betting.
  * Bets lock when status changes from TIMED/SCHEDULED.
  */
