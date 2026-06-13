@@ -86,7 +86,7 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
             </div>
 
             <p className="text-silver/40 text-xs tracking-widest uppercase">
-              Brought to you by Naila&apos;s HR Safe Gambling
+              A Naila-approved workplace engagement activity
             </p>
           </div>
 
@@ -132,6 +132,12 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
           </div>
         </div>
       </main>
+
+      <footer className="px-6 py-4 text-center">
+        <p className="text-silver/40 text-xs">
+          Created by Teo McArthur <span className="text-silver/25">(ideation by Naila)</span>
+        </p>
+      </footer>
     </>
   );
 }
