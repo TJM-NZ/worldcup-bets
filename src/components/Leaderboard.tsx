@@ -8,6 +8,8 @@ interface LeaderboardEntry {
   id: string;
   display_name: string;
   gems: number;
+  crestUrl?: string;
+  teamName?: string;
   // Games: based on prediction correctness (all bets)
   gamesWon: number;
   gamesLost: number;
@@ -38,7 +40,7 @@ export default function Leaderboard({
     async function load() {
       const { data: memberData } = await supabase
         .from("members")
-        .select("id, display_name, gems")
+        .select("id, display_name, gems, winner_picks(teams(crest_url, name))")
         .eq("workspace_id", workspaceId)
         .order("gems", { ascending: false });
 
@@ -85,7 +87,18 @@ export default function Leaderboard({
         }
       }
 
-      setMembers(memberData.map((m) => ({ ...m, ...stats[m.id] })));
+      setMembers(
+        memberData.map((m) => {
+          const pick = Array.isArray(m.winner_picks) ? m.winner_picks[0] : m.winner_picks;
+          const team = pick?.teams as { crest_url?: string; name?: string } | null | undefined;
+          return {
+            ...m,
+            ...stats[m.id],
+            crestUrl: team?.crest_url ?? undefined,
+            teamName: team?.name ?? undefined,
+          };
+        })
+      );
     }
 
     load();
@@ -134,11 +147,22 @@ export default function Leaderboard({
               >
                 {i + 1}
               </span>
-              <span className="flex-1 truncate font-medium">
-                {member.display_name}
-                {member.id === currentMemberId && (
-                  <span className="text-silver ml-2 text-xs">(you)</span>
+              <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
+                {member.crestUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.crestUrl}
+                    alt={member.teamName || ""}
+                    className="h-5 w-5 shrink-0 object-contain"
+                    title={member.teamName}
+                  />
                 )}
+                <span className="truncate">
+                  {member.display_name}
+                  {member.id === currentMemberId && (
+                    <span className="text-silver ml-2 text-xs">(you)</span>
+                  )}
+                </span>
               </span>
               <GemBadge gems={member.gems} size="sm" />
             </div>
