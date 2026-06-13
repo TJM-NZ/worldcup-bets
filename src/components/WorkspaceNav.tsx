@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import GemBadge from "./GemBadge";
@@ -78,12 +79,110 @@ function StarIcon({ className }: { className?: string }) {
   );
 }
 
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
 const primaryTabs = [
   { key: "", label: "Dashboard", icon: HomeIcon },
   { key: "/matches", label: "Matches", icon: CalendarIcon },
   { key: "/leaderboard", label: "Board", icon: TrophyIcon },
   { key: "/winner-pick", label: "Winner", icon: StarIcon },
 ] as const;
+
+interface WorkspaceItem {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+function WorkspaceSwitcher({ currentSlug }: { currentSlug: string }) {
+  const [open, setOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  async function fetchWorkspaces() {
+    if (loaded) return;
+    const res = await fetch("/api/workspaces");
+    if (res.ok) {
+      const data = await res.json();
+      setWorkspaces(data.workspaces);
+    }
+    setLoaded(true);
+  }
+
+  function handleToggle() {
+    if (!open) fetchWorkspaces();
+    setOpen(!open);
+  }
+
+  const otherWorkspaces = workspaces.filter((w) => w.slug !== currentSlug);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={handleToggle} className="text-accent flex items-center gap-1 font-bold">
+        <span className="max-w-[150px] truncate">
+          {workspaces.find((w) => w.slug === currentSlug)?.name ?? currentSlug}
+        </span>
+        <ChevronDownIcon className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="border-card-hover bg-card absolute top-full left-0 z-20 mt-2 min-w-[200px] rounded-lg border shadow-lg">
+          {!loaded ? (
+            <div className="text-silver px-4 py-3 text-sm">Loading...</div>
+          ) : (
+            <>
+              {otherWorkspaces.length > 0 && (
+                <div className="border-card-hover border-b py-1">
+                  {otherWorkspaces.map((w) => (
+                    <Link
+                      key={w.id}
+                      href={`/workspace/${w.slug}`}
+                      onClick={() => setOpen(false)}
+                      className="text-foreground hover:bg-accent/10 block px-4 py-2 text-sm transition-colors"
+                    >
+                      {w.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
+              <Link
+                href="/setup"
+                onClick={() => setOpen(false)}
+                className="text-accent hover:bg-accent/10 block px-4 py-2 text-sm transition-colors"
+              >
+                + Create or Join
+              </Link>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function WorkspaceNav() {
   const pathname = usePathname();
@@ -123,9 +222,9 @@ export default function WorkspaceNav() {
         <div className="mx-auto max-w-5xl px-4">
           <div className="flex h-14 items-center justify-between">
             <div className="flex items-center gap-1">
-              <Link href={base} className="text-accent mr-4 font-bold">
-                {workspace.name}
-              </Link>
+              <div className="mr-4">
+                <WorkspaceSwitcher currentSlug={workspace.slug} />
+              </div>
               {links.map((link) => (
                 <Link
                   key={link.href}
@@ -156,9 +255,7 @@ export default function WorkspaceNav() {
       {/* Mobile top bar — name + gems only */}
       <nav className="border-card bg-card/50 sticky top-0 z-10 border-b backdrop-blur-sm sm:hidden">
         <div className="flex h-12 items-center justify-between px-4">
-          <Link href={base} className="text-accent font-bold">
-            {workspace.name}
-          </Link>
+          <WorkspaceSwitcher currentSlug={workspace.slug} />
           <GemBadge gems={member.gems} />
         </div>
       </nav>
