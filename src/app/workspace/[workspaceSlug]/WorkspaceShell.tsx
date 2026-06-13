@@ -52,6 +52,9 @@ export default function WorkspaceShell({
           <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 sm:pb-6">
             {children}
           </main>
+          <footer className="text-silver pb-20 text-center text-xs sm:pb-4">
+            Scores updated daily at 6pm NZT
+          </footer>
         </div>
       </TourProvider>
     </WorkspaceProvider>

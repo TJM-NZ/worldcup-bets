@@ -1,5 +1,5 @@
 import { createServiceClient } from "./supabase/server";
-import { fetchTeams, fetchMatches, fetchStandings } from "./football-api";
+import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
 import { calculatePayouts, winnerToPrediction } from "./betting";
 import { FdMatch } from "./types";
 
@@ -14,7 +14,6 @@ export async function syncTeams(): Promise<number> {
   // Build group lookup
   const groupMap = new Map<number, string>();
   for (const s of standings) {
-    // group comes as "GROUP_A" etc, extract letter
     const letter = s.group.replace("GROUP_", "");
     groupMap.set(s.team.id, letter);
   }
@@ -275,6 +274,51 @@ export async function shouldSync(): Promise<boolean> {
 
   // Default: sync every 30 min
   return secondsSinceSync >= 1800;
+}
+
+/** Sync group standings from the API into the DB — gated to once per ~day */
+export async function syncStandings(): Promise<number> {
+  const supabase = createServiceClient();
+
+  // Only call the API if standings are stale (>20h) or table is empty
+  const { data: latest } = await supabase
+    .from("group_standings")
+    .select("updated_at")
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const hoursSinceUpdate = latest
+    ? (Date.now() - new Date(latest.updated_at).getTime()) / 3600000
+    : Infinity;
+
+  if (hoursSinceUpdate < 20) return 0;
+
+  const entries: FdStandingEntry[] = await fetchStandings().catch(() => []);
+  if (entries.length === 0) return 0;
+
+  const now = new Date().toISOString();
+  const rows = entries.map((e) => ({
+    group_name: e.group,
+    position: e.position,
+    team_id: e.team.id,
+    played: e.playedGames,
+    won: e.won,
+    drawn: e.draw,
+    lost: e.lost,
+    goals_for: e.goalsFor,
+    goals_against: e.goalsAgainst,
+    goal_difference: e.goalDifference,
+    points: e.points,
+    updated_at: now,
+  }));
+
+  const { error } = await supabase
+    .from("group_standings")
+    .upsert(rows, { onConflict: "group_name,team_id" });
+
+  if (error) throw new Error(`Standings sync failed: ${error.message}`);
+  return rows.length;
 }
 
 /** Log a sync run */

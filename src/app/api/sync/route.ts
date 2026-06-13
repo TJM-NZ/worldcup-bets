@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { syncTeams, syncMatches, shouldSync, logSync } from "@/lib/sync";
+import { syncTeams, syncMatches, syncStandings, shouldSync, logSync } from "@/lib/sync";
 
 export async function GET(request: Request) {
   // Verify cron secret (Vercel injects this for cron jobs)
@@ -23,6 +23,9 @@ export async function GET(request: Request) {
     // Sync matches and resolve bets
     const { matchesUpdated, betsResolved } = await syncMatches();
 
+    // Sync standings (daily-gated — no-op if updated recently)
+    const standingsCount = await syncStandings();
+
     await logSync(matchesUpdated);
 
     return NextResponse.json({
@@ -30,6 +33,7 @@ export async function GET(request: Request) {
       teams: teamsCount,
       matchesUpdated,
       betsResolved,
+      standingsUpdated: standingsCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown sync error";

@@ -153,7 +153,11 @@ function WorkspaceSwitcher({
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={handleToggle} className="text-accent flex items-center gap-1 font-bold">
+      <button
+        onClick={handleToggle}
+        data-tour="workspace-switcher"
+        className="text-accent flex items-center gap-1 font-bold"
+      >
         <span className="max-w-[150px] truncate">
           {workspaces.find((w) => w.slug === currentSlug)?.name ?? currentSlug}
         </span>
@@ -265,20 +269,30 @@ export default function WorkspaceNav() {
                   onSignOut={handleSignOut}
                 />
               </div>
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  data-tour={link.label === "Winner Pick" ? "winner-nav" : undefined}
-                  className={`rounded-lg px-3 py-2 text-sm transition-colors ${
-                    pathname === link.href
-                      ? "bg-accent/20 text-accent font-semibold"
-                      : "text-silver hover:text-foreground"
-                  }`}
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {links.map((link) => {
+                const tourAttr =
+                  link.label === "Winner Pick"
+                    ? "winner-nav"
+                    : link.label === "Matches"
+                      ? "nav-matches"
+                      : link.label === "Leaderboard"
+                        ? "nav-leaderboard"
+                        : undefined;
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    data-tour={tourAttr}
+                    className={`rounded-lg px-3 py-2 text-sm transition-colors ${
+                      pathname === link.href
+                        ? "bg-accent/20 text-accent font-semibold"
+                        : "text-silver hover:text-foreground"
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                );
+              })}
             </div>
             <div className="flex items-center gap-3">
               <span data-tour="gem-balance">

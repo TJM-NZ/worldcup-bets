@@ -1,104 +1,25 @@
 "use client";
 
-import { Match, Team } from "@/lib/types";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
-interface TeamStanding {
-  team: Team;
+interface StandingRow {
+  group_name: string;
+  position: number;
+  team_id: number;
   played: number;
   won: number;
   drawn: number;
   lost: number;
-  gf: number;
-  ga: number;
-  gd: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
   points: number;
-}
-
-function buildStandings(matches: Match[], teams: Map<number, Team>): Map<string, TeamStanding[]> {
-  // Seed groups from team.group_letter
-  const standingsMap = new Map<string, Map<number, TeamStanding>>();
-  for (const team of teams.values()) {
-    if (!team.group_letter) continue;
-    const key = `GROUP_${team.group_letter}`;
-    if (!standingsMap.has(key)) standingsMap.set(key, new Map());
-    standingsMap.get(key)!.set(team.id, {
-      team,
-      played: 0,
-      won: 0,
-      drawn: 0,
-      lost: 0,
-      gf: 0,
-      ga: 0,
-      gd: 0,
-      points: 0,
-    });
-  }
-
-  // Accumulate results from finished group-stage matches
-  for (const m of matches) {
-    if (
-      m.status !== "FINISHED" ||
-      !m.group_name ||
-      m.home_score === null ||
-      m.away_score === null ||
-      !m.home_team_id ||
-      !m.away_team_id
-    )
-      continue;
-
-    const group = standingsMap.get(m.group_name);
-    if (!group) continue;
-
-    const home = group.get(m.home_team_id);
-    const away = group.get(m.away_team_id);
-    if (!home || !away) continue;
-
-    home.played++;
-    away.played++;
-    home.gf += m.home_score;
-    home.ga += m.away_score;
-    away.gf += m.away_score;
-    away.ga += m.home_score;
-    home.gd = home.gf - home.ga;
-    away.gd = away.gf - away.ga;
-
-    const winner =
-      m.winner ??
-      (m.home_score > m.away_score
-        ? "HOME_TEAM"
-        : m.away_score > m.home_score
-          ? "AWAY_TEAM"
-          : "DRAW");
-
-    if (winner === "HOME_TEAM") {
-      home.won++;
-      home.points += 3;
-      away.lost++;
-    } else if (winner === "AWAY_TEAM") {
-      away.won++;
-      away.points += 3;
-      home.lost++;
-    } else if (winner === "DRAW") {
-      home.drawn++;
-      home.points++;
-      away.drawn++;
-      away.points++;
-    }
-  }
-
-  // Sort each group: Pts → GD → GF → name
-  const result = new Map<string, TeamStanding[]>();
-  for (const [key, teamMap] of standingsMap) {
-    const sorted = [...teamMap.values()].sort((a, b) => {
-      if (b.points !== a.points) return b.points - a.points;
-      if (b.gd !== a.gd) return b.gd - a.gd;
-      if (b.gf !== a.gf) return b.gf - a.gf;
-      return a.team.name.localeCompare(b.team.name);
-    });
-    result.set(key, sorted);
-  }
-
-  return new Map([...result.entries()].sort());
+  teams: {
+    name: string;
+    tla: string | null;
+    crest_url: string | null;
+  } | null;
 }
 
 function rowStyle(pos: number): string {
@@ -107,26 +28,43 @@ function rowStyle(pos: number): string {
   return "";
 }
 
-export default function GroupStandings({
-  matches,
-  teams,
-}: {
-  matches: Match[];
-  teams: Map<number, Team>;
-}) {
-  const standings = buildStandings(matches, teams);
+export default function GroupStandings() {
+  const [byGroup, setByGroup] = useState<Map<string, StandingRow[]>>(new Map());
+  const [loading, setLoading] = useState(true);
 
-  if (standings.size === 0) {
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("group_standings")
+      .select("*, teams(name, tla, crest_url)")
+      .order("group_name", { ascending: true })
+      .order("position", { ascending: true })
+      .then(({ data }) => {
+        const map = new Map<string, StandingRow[]>();
+        for (const row of data ?? []) {
+          if (!map.has(row.group_name)) map.set(row.group_name, []);
+          map.get(row.group_name)!.push(row as StandingRow);
+        }
+        setByGroup(map);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) {
+    return <p className="text-silver py-8 text-center">Loading standings…</p>;
+  }
+
+  if (byGroup.size === 0) {
     return <p className="text-silver py-8 text-center">Group standings not available yet.</p>;
   }
 
   return (
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {[...standings.entries()].map(([key, rows]) => {
-          const label = key.replace("GROUP_", "Group ");
+        {[...byGroup.entries()].map(([groupName, rows]) => {
+          const label = groupName.replace("GROUP_", "Group ");
           return (
-            <div key={key} className="border-card bg-card overflow-hidden rounded-lg border">
+            <div key={groupName} className="border-card bg-card overflow-hidden rounded-lg border">
               <div className="bg-card-hover px-3 py-2">
                 <h3 className="text-sm font-semibold">{label}</h3>
               </div>
@@ -144,23 +82,25 @@ export default function GroupStandings({
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, i) => (
+                  {rows.map((row) => (
                     <tr
-                      key={row.team.id}
-                      className={`border-card-hover/40 border-b last:border-0 ${rowStyle(i)}`}
+                      key={row.team_id}
+                      className={`border-card-hover/40 border-b last:border-0 ${rowStyle(row.position - 1)}`}
                     >
-                      <td className="text-silver px-3 py-2 text-xs">{i + 1}</td>
+                      <td className="text-silver px-3 py-2 text-xs">{row.position}</td>
                       <td className="px-2 py-2">
                         <div className="flex items-center gap-1.5">
-                          {row.team.crest_url && (
+                          {row.teams?.crest_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
-                              src={row.team.crest_url}
-                              alt={row.team.tla || row.team.name}
+                              src={row.teams.crest_url}
+                              alt={row.teams.tla || row.teams.name}
                               className="h-4 w-4 object-contain"
                             />
                           )}
-                          <span className="font-medium">{row.team.tla || row.team.name}</span>
+                          <span className="font-medium">
+                            {row.teams?.tla || row.teams?.name || row.team_id}
+                          </span>
                         </div>
                       </td>
                       <td className="text-silver px-1 py-2 text-center text-xs">{row.played}</td>
@@ -168,7 +108,7 @@ export default function GroupStandings({
                       <td className="text-silver px-1 py-2 text-center text-xs">{row.drawn}</td>
                       <td className="text-silver px-1 py-2 text-center text-xs">{row.lost}</td>
                       <td className="text-silver px-1 py-2 text-center text-xs">
-                        {row.gd > 0 ? `+${row.gd}` : row.gd}
+                        {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
                       </td>
                       <td className="px-1 py-2 text-center font-bold">{row.points}</td>
                     </tr>

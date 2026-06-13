@@ -50,19 +50,58 @@ export async function fetchMatches(): Promise<FdMatch[]> {
   return data.matches;
 }
 
-/** Fetch standings to get group letters for teams */
-export async function fetchStandings(): Promise<Array<{ group: string; team: { id: number } }>> {
+export interface FdStandingEntry {
+  group: string;
+  position: number;
+  team: { id: number };
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+}
+
+/** Fetch standings — returns full row data for all groups */
+export async function fetchStandings(): Promise<FdStandingEntry[]> {
   const data = await fetchApi<{
     standings: Array<{
       group: string;
-      table: Array<{ team: { id: number } }>;
+      type: string;
+      table: Array<{
+        position: number;
+        team: { id: number };
+        playedGames: number;
+        won: number;
+        draw: number;
+        lost: number;
+        goalsFor: number;
+        goalsAgainst: number;
+        goalDifference: number;
+        points: number;
+      }>;
     }>;
   }>("/competitions/WC/standings");
 
-  const result: Array<{ group: string; team: { id: number } }> = [];
+  const result: FdStandingEntry[] = [];
   for (const standing of data.standings) {
+    if (standing.type !== "TOTAL") continue;
     for (const entry of standing.table) {
-      result.push({ group: standing.group, team: entry.team });
+      result.push({
+        group: standing.group,
+        position: entry.position,
+        team: entry.team,
+        playedGames: entry.playedGames,
+        won: entry.won,
+        draw: entry.draw,
+        lost: entry.lost,
+        goalsFor: entry.goalsFor,
+        goalsAgainst: entry.goalsAgainst,
+        goalDifference: entry.goalDifference,
+        points: entry.points,
+      });
     }
   }
   return result;

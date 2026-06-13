@@ -116,7 +116,7 @@ export default function MatchesPage() {
       </div>
 
       {filter === "standings" ? (
-        <GroupStandings matches={matches} teams={teams} />
+        <GroupStandings />
       ) : (
         <>
           {showNextUp && (
