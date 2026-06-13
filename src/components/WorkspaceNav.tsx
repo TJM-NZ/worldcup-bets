@@ -323,11 +323,19 @@ export default function WorkspaceNav() {
           {primaryTabs.map((tab) => {
             const active = isActive(tab.key);
             const Icon = tab.icon;
+            const tourAttr =
+              tab.key === "/winner-pick"
+                ? "winner-nav"
+                : tab.key === "/matches"
+                  ? "nav-matches"
+                  : tab.key === "/leaderboard"
+                    ? "nav-leaderboard"
+                    : undefined;
             return (
               <Link
                 key={tab.key}
                 href={base + tab.key}
-                data-tour={tab.key === "/winner-pick" ? "winner-nav" : undefined}
+                data-tour={tourAttr}
                 className={`flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors ${
                   active ? "text-accent" : "text-silver"
                 }`}

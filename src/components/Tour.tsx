@@ -20,12 +20,12 @@ const TOUR_STEPS: TourStep[] = [
     body: "Gems are your betting currency. You start with 1,000. Win bets to grow your balance — lose and you shrink. Don't go broke!",
   },
   {
-    target: "[data-tour='upcoming-matches']",
+    target: "[data-tour='nav-matches']",
     title: "Place Your Bets",
-    body: "Click any match card to open it. Pick the home team, away team, or a draw — then wager as many gems as you dare.",
+    body: "Head to Matches to see every game. Tap a match to pick the home team, away team, or a draw — then wager as many gems as you dare.",
   },
   {
-    target: "[data-tour='leaderboard-section']",
+    target: "[data-tour='nav-leaderboard']",
     title: "The Leaderboard",
     body: "Your gem total determines your rank. Win more bets than everyone else to claim the top spot and ultimate bragging rights.",
   },
@@ -33,6 +33,11 @@ const TOUR_STEPS: TourStep[] = [
     target: "[data-tour='winner-nav']",
     title: "Pick the Tournament Winner",
     body: "Don't forget to predict the overall World Cup winner! Get it right and you'll earn a huge gem bonus when the trophy is lifted.",
+  },
+  {
+    target: "[data-tour='workspace-switcher']",
+    title: "Your Workspace",
+    body: "Tap your workspace name to switch between pools, create or join a new one, or sign out.",
   },
 ];
 
