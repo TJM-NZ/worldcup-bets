@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet, Prediction } from "@/lib/types";
-import { isBettingOpen, calculateOdds, isDrawAvailable } from "@/lib/betting";
+import {
+  isBettingOpen,
+  calculateOdds,
+  calculateProbabilities,
+  isDrawAvailable,
+} from "@/lib/betting";
 import BetForm from "@/components/BetForm";
 import CountdownTimer from "@/components/CountdownTimer";
 import GemBadge from "@/components/GemBadge";
@@ -147,6 +152,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
   }
   const totalPool = pools.HOME + pools.AWAY + pools.DRAW;
   const odds = calculateOdds(pools);
+  const probabilities = calculateProbabilities(pools);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -277,10 +283,32 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
         {totalPool > 0 ? (
           <div className="space-y-2">
             {[
-              { label: homeTeam?.tla || "Home", pool: pools.HOME, mult: odds.HOME },
-              { label: awayTeam?.tla || "Away", pool: pools.AWAY, mult: odds.AWAY },
-              ...(showDraw ? [{ label: "Draw", pool: pools.DRAW, mult: odds.DRAW }] : []),
-            ].map(({ label, pool, mult }) => (
+              {
+                label: homeTeam?.tla || "Home",
+                pool: pools.HOME,
+                mult: odds.HOME,
+                prob: probabilities.HOME,
+                pred: "HOME" as Prediction,
+              },
+              {
+                label: awayTeam?.tla || "Away",
+                pool: pools.AWAY,
+                mult: odds.AWAY,
+                prob: probabilities.AWAY,
+                pred: "AWAY" as Prediction,
+              },
+              ...(showDraw
+                ? [
+                    {
+                      label: "Draw",
+                      pool: pools.DRAW,
+                      mult: odds.DRAW,
+                      prob: probabilities.DRAW,
+                      pred: "DRAW" as Prediction,
+                    },
+                  ]
+                : []),
+            ].map(({ label, pool, mult, prob }) => (
               <div key={label} className="flex items-center gap-3">
                 <span className="text-silver w-16 text-sm">{label}</span>
                 <div className="bg-background h-4 flex-1 overflow-hidden rounded-full">
@@ -289,6 +317,9 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                     style={{ width: totalPool > 0 ? `${(pool / totalPool) * 100}%` : "0%" }}
                   />
                 </div>
+                <span className="w-10 text-right text-sm font-semibold">
+                  {prob != null ? `${prob}%` : "—"}
+                </span>
                 <GemBadge gems={pool} size="sm" />
                 <span className="text-silver w-12 text-right text-xs">
                   {mult != null ? `${mult.toFixed(1)}x` : "—"}
