@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import GemBadge from "./GemBadge";
+import NotificationBell from "./NotificationBell";
 import { useTour } from "./Tour";
 
 function HomeIcon({ className }: { className?: string }) {
@@ -295,6 +296,7 @@ export default function WorkspaceNav() {
               })}
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <span data-tour="gem-balance">
                 <GemBadge gems={member.gems} />
               </span>
@@ -311,9 +313,12 @@ export default function WorkspaceNav() {
             isAdmin={isAdmin}
             onSignOut={handleSignOut}
           />
-          <span data-tour="gem-balance">
-            <GemBadge gems={member.gems} />
-          </span>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <span data-tour="gem-balance">
+              <GemBadge gems={member.gems} />
+            </span>
+          </div>
         </div>
       </nav>
 

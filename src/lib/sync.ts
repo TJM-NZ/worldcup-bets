@@ -119,6 +119,23 @@ async function resolveMatch(
 
   const supabase = createServiceClient();
 
+  // Fetch team names for notification messages
+  const { data: matchRow } = await supabase
+    .from("matches")
+    .select("home_team_id, away_team_id")
+    .eq("id", matchId)
+    .single();
+  const teamIds = [matchRow?.home_team_id, matchRow?.away_team_id].filter(Boolean) as number[];
+  const { data: teams } = await supabase.from("teams").select("id, tla").in("id", teamIds);
+  const teamsMap = new Map(teams?.map((t) => [t.id, t.tla]) ?? []);
+  const homeTla = (matchRow?.home_team_id && teamsMap.get(matchRow.home_team_id)) || "Home";
+  const awayTla = (matchRow?.away_team_id && teamsMap.get(matchRow.away_team_id)) || "Away";
+  const scoreLabel = `${homeScore}–${awayScore}`;
+  const matchLabel = `${homeTla} vs ${awayTla}`;
+
+  const predLabel = (pred: string) =>
+    pred === "HOME" ? homeTla : pred === "AWAY" ? awayTla : "Draw";
+
   // Get all unresolved bets for this match
   const { data: bets, error } = await supabase
     .from("bets")
@@ -154,6 +171,14 @@ async function resolveMatch(
   }
 
   let totalResolved = 0;
+  const notifRows: {
+    member_id: string;
+    type: string;
+    title: string;
+    body: string;
+    match_id: number;
+    gems_delta: number;
+  }[] = [];
 
   // Calculate payouts per workspace
   for (const [, wsBets] of workspaceBets) {
@@ -181,6 +206,19 @@ async function resolveMatch(
         });
       }
 
+      const bet = wsBets.find((b) => b.id === payout.bet_id)!;
+      const won = payout.gems_won > 0;
+      notifRows.push({
+        member_id: payout.member_id,
+        type: won ? "bet_won" : "bet_lost",
+        title: won ? `+${payout.gems_won} gems` : `-${bet.gems_wagered} gems`,
+        body: won
+          ? `Your ${predLabel(bet.prediction)} bet on ${matchLabel} paid off (${scoreLabel})`
+          : `Your ${predLabel(bet.prediction)} bet on ${matchLabel} didn't pay off (${scoreLabel})`,
+        match_id: matchId,
+        gems_delta: won ? payout.gems_won : -bet.gems_wagered,
+      });
+
       totalResolved++;
     }
   }
@@ -205,7 +243,22 @@ async function resolveMatch(
       });
     }
 
+    notifRows.push({
+      member_id: bet.member_id,
+      type: correct ? "score_bet_won" : "score_bet_lost",
+      title: correct ? `+${gems_won} gems` : `-${bet.gems_wagered} gems`,
+      body: correct
+        ? `Exact score! You predicted ${bet.predicted_home}–${bet.predicted_away} on ${matchLabel}`
+        : `You predicted ${bet.predicted_home}–${bet.predicted_away} on ${matchLabel} (result: ${scoreLabel})`,
+      match_id: matchId,
+      gems_delta: correct ? gems_won : -bet.gems_wagered,
+    });
+
     totalResolved++;
+  }
+
+  if (notifRows.length > 0) {
+    await supabase.from("notifications").insert(notifRows);
   }
 
   return totalResolved;
@@ -215,6 +268,27 @@ async function resolveMatch(
 async function refundMatch(matchId: number): Promise<number> {
   const supabase = createServiceClient();
   let total = 0;
+
+  const { data: matchRow } = await supabase
+    .from("matches")
+    .select("home_team_id, away_team_id")
+    .eq("id", matchId)
+    .single();
+  const teamIds = [matchRow?.home_team_id, matchRow?.away_team_id].filter(Boolean) as number[];
+  const { data: teams } = await supabase.from("teams").select("id, tla").in("id", teamIds);
+  const teamsMap = new Map(teams?.map((t) => [t.id, t.tla]) ?? []);
+  const homeTla = (matchRow?.home_team_id && teamsMap.get(matchRow.home_team_id)) || "Home";
+  const awayTla = (matchRow?.away_team_id && teamsMap.get(matchRow.away_team_id)) || "Away";
+  const matchLabel = `${homeTla} vs ${awayTla}`;
+
+  const notifRows: {
+    member_id: string;
+    type: string;
+    title: string;
+    body: string;
+    match_id: number;
+    gems_delta: number;
+  }[] = [];
 
   const { data: bets } = await supabase
     .from("bets")
@@ -230,6 +304,14 @@ async function refundMatch(matchId: number): Promise<number> {
     await supabase.rpc("increment_gems", {
       p_member_id: bet.member_id,
       p_amount: bet.gems_wagered,
+    });
+    notifRows.push({
+      member_id: bet.member_id,
+      type: "refund",
+      title: `+${bet.gems_wagered} gems refunded`,
+      body: `${matchLabel} was cancelled — your bet has been refunded`,
+      match_id: matchId,
+      gems_delta: bet.gems_wagered,
     });
     total++;
   }
@@ -249,7 +331,19 @@ async function refundMatch(matchId: number): Promise<number> {
       p_member_id: bet.member_id,
       p_amount: bet.gems_wagered,
     });
+    notifRows.push({
+      member_id: bet.member_id,
+      type: "refund",
+      title: `+${bet.gems_wagered} gems refunded`,
+      body: `${matchLabel} was cancelled — your exact score bet has been refunded`,
+      match_id: matchId,
+      gems_delta: bet.gems_wagered,
+    });
     total++;
+  }
+
+  if (notifRows.length > 0) {
+    await supabase.from("notifications").insert(notifRows);
   }
 
   return total;
