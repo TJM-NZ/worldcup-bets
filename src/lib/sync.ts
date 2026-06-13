@@ -276,23 +276,25 @@ export async function shouldSync(): Promise<boolean> {
   return secondsSinceSync >= 1800;
 }
 
-/** Sync group standings from the API into the DB — gated to once per ~day */
-export async function syncStandings(): Promise<number> {
+/** Sync group standings from the API into the DB — gated to once per ~day unless forced */
+export async function syncStandings(force = false): Promise<number> {
   const supabase = createServiceClient();
 
-  // Only call the API if standings are stale (>20h) or table is empty
-  const { data: latest } = await supabase
-    .from("group_standings")
-    .select("updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(1)
-    .single();
+  if (!force) {
+    // Only call the API if standings are stale (>20h) or table is empty
+    const { data: latest } = await supabase
+      .from("group_standings")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .single();
 
-  const hoursSinceUpdate = latest
-    ? (Date.now() - new Date(latest.updated_at).getTime()) / 3600000
-    : Infinity;
+    const hoursSinceUpdate = latest
+      ? (Date.now() - new Date(latest.updated_at).getTime()) / 3600000
+      : Infinity;
 
-  if (hoursSinceUpdate < 20) return 0;
+    if (hoursSinceUpdate < 20) return 0;
+  }
 
   const entries: FdStandingEntry[] = await fetchStandings().catch(() => []);
   if (entries.length === 0) return 0;

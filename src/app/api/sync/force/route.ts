@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { syncTeams, syncMatches, logSync } from "@/lib/sync";
+import { syncTeams, syncMatches, syncStandings, logSync } from "@/lib/sync";
 
 export async function POST() {
   const supabase = await createClient();
@@ -15,6 +15,7 @@ export async function POST() {
   try {
     const teamsCount = await syncTeams();
     const { matchesUpdated, betsResolved } = await syncMatches();
+    const standingsCount = await syncStandings(true);
     await logSync(matchesUpdated);
 
     return NextResponse.json({
@@ -22,6 +23,7 @@ export async function POST() {
       teams: teamsCount,
       matchesUpdated,
       betsResolved,
+      standingsUpdated: standingsCount,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown sync error";
