@@ -47,7 +47,7 @@ export default function WorkspaceShell({
     <WorkspaceProvider workspace={workspace} member={member}>
       <div className="flex flex-1 flex-col">
         <WorkspaceNav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 sm:pb-6">{children}</main>
       </div>
     </WorkspaceProvider>
   );
