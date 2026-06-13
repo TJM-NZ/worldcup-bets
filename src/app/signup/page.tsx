@@ -26,11 +26,9 @@ function SignupForm() {
       });
       if (authError) throw authError;
 
-      if (redirect) {
-        window.location.href = redirect;
-      } else {
-        window.location.href = "/setup";
-      }
+      const safeRedirect =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/setup";
+      window.location.href = safeRedirect;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign up");
     } finally {

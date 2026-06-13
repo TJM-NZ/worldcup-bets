@@ -1,16 +1,37 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId } = await params;
   const supabase = createServiceClient();
 
+  // Verify the caller is a member of this workspace before returning data
+  const { data: callerMembership } = await supabase
+    .from("members")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!callerMembership) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { data, error } = await supabase
     .from("members")
-    .select("*")
+    .select("id, display_name, gems, role, created_at")
     .eq("workspace_id", workspaceId)
     .order("gems", { ascending: false });
 
@@ -25,11 +46,20 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ workspaceId: string }> }
 ) {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { workspaceId } = await params;
   const body = await request.json();
-  const { requesterId, targetMemberId, role } = body;
+  const { targetMemberId, role } = body;
 
-  if (!requesterId || !targetMemberId || !role) {
+  if (!targetMemberId || !role) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -39,12 +69,12 @@ export async function PATCH(
 
   const supabase = createServiceClient();
 
-  // Verify requester is an admin of this workspace
+  // Verify the authenticated user is an admin of this workspace
   const { data: requester } = await supabase
     .from("members")
     .select("role")
     .eq("workspace_id", workspaceId)
-    .eq("user_id", requesterId)
+    .eq("user_id", user.id)
     .single();
 
   if (!requester || requester.role !== "admin") {

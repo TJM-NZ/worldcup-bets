@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { memberId, teamId } = body;
 
@@ -10,6 +19,18 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+
+  // Verify the memberId belongs to the authenticated user
+  const { data: member } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", memberId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!member) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   // Verify team exists
   const { data: team } = await supabase.from("teams").select("id").eq("id", teamId).single();
