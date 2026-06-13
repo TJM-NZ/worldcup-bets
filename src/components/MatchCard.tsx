@@ -81,7 +81,7 @@ export default function MatchCard({
       }`}
     >
       <div className="text-silver mb-2 flex items-center justify-between text-xs">
-        <span>{match.group_name || match.stage.replace(/_/g, " ")}</span>
+        <span>{(match.group_name || match.stage).replace(/_/g, " ")}</span>
         {isLive && <span className="text-danger font-bold">{statusLabel(match.status)}</span>}
         {isFinished && <span className="text-silver">{statusLabel(match.status)}</span>}
         {isOpen && <CountdownTimer targetDate={match.utc_date} />}

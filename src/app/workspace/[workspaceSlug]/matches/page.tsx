@@ -79,7 +79,7 @@ export default function MatchesPage() {
   // Group by stage (only used for match list views)
   const grouped = new Map<string, Match[]>();
   for (const m of filtered) {
-    const key = m.group_name || m.stage.replace(/_/g, " ");
+    const key = (m.group_name || m.stage).replace(/_/g, " ");
     if (!grouped.has(key)) grouped.set(key, []);
     grouped.get(key)!.push(m);
   }
