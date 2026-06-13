@@ -150,7 +150,7 @@ export default function WorkspaceDashboard() {
         </section>
       )}
 
-      <section>
+      <section data-tour="upcoming-matches">
         <h2 className="mb-3 text-xl font-bold">Upcoming Matches</h2>
         {upcoming.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -172,7 +172,7 @@ export default function WorkspaceDashboard() {
         )}
       </section>
 
-      <section>
+      <section data-tour="leaderboard-section">
         <h2 className="mb-3 text-xl font-bold">Leaderboard</h2>
         <Leaderboard workspaceId={workspace.id} currentMemberId={member.id} />
       </section>

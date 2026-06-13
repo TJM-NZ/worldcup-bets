@@ -229,6 +229,7 @@ export default function WorkspaceNav() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  data-tour={link.label === "Winner Pick" ? "winner-nav" : undefined}
                   className={`rounded-lg px-3 py-2 text-sm transition-colors ${
                     pathname === link.href
                       ? "bg-accent/20 text-accent font-semibold"
@@ -240,7 +241,9 @@ export default function WorkspaceNav() {
               ))}
             </div>
             <div className="flex items-center gap-3">
-              <GemBadge gems={member.gems} />
+              <span data-tour="gem-balance">
+                <GemBadge gems={member.gems} />
+              </span>
               <button
                 onClick={handleSignOut}
                 className="text-silver hover:text-foreground text-sm transition-colors"
@@ -256,7 +259,9 @@ export default function WorkspaceNav() {
       <nav className="border-card bg-card/50 sticky top-0 z-10 border-b backdrop-blur-sm sm:hidden">
         <div className="flex h-12 items-center justify-between px-4">
           <WorkspaceSwitcher currentSlug={workspace.slug} />
-          <GemBadge gems={member.gems} />
+          <span data-tour="gem-balance">
+            <GemBadge gems={member.gems} />
+          </span>
         </div>
       </nav>
 
@@ -270,6 +275,7 @@ export default function WorkspaceNav() {
               <Link
                 key={tab.key}
                 href={base + tab.key}
+                data-tour={tab.key === "/winner-pick" ? "winner-nav" : undefined}
                 className={`flex flex-col items-center gap-0.5 px-3 py-1.5 text-xs transition-colors ${
                   active ? "text-accent" : "text-silver"
                 }`}
