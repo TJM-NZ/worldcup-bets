@@ -26,7 +26,9 @@ function LoginForm() {
       });
       if (authError) throw authError;
 
-      window.location.href = redirect || "/setup";
+      const safeRedirect =
+        redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/setup";
+      window.location.href = safeRedirect;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");
     } finally {

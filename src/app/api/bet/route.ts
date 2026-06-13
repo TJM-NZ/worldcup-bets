@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isBettingOpen, isDrawAvailable } from "@/lib/betting";
 import { Prediction } from "@/lib/types";
 
 export async function POST(request: Request) {
+  const authClient = await createClient();
+  const {
+    data: { user },
+  } = await authClient.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await request.json();
   const { memberId, matchId, prediction, gemsWagered } = body as {
     memberId: string;
@@ -25,6 +34,18 @@ export async function POST(request: Request) {
   }
 
   const supabase = createServiceClient();
+
+  // Verify the memberId belongs to the authenticated user
+  const { data: member } = await supabase
+    .from("members")
+    .select("id")
+    .eq("id", memberId)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!member) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   // Verify match exists and is open for betting
   const { data: match, error: matchError } = await supabase
