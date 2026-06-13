@@ -1,8 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
-export default function SetupForm({ userId }: { userId: string }) {
+interface ExistingWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export default function SetupForm({
+  userId,
+  existingWorkspaces = [],
+}: {
+  userId: string;
+  existingWorkspaces?: ExistingWorkspace[];
+}) {
   const [mode, setMode] = useState<"choose" | "create" | "join">("choose");
   const [workspaceName, setWorkspaceName] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -69,8 +82,28 @@ export default function SetupForm({ userId }: { userId: string }) {
   return (
     <main className="flex flex-1 items-center justify-center px-4 py-12">
       <div className="w-full max-w-md space-y-8 text-center">
+        {existingWorkspaces.length > 0 && (
+          <div className="bg-card space-y-3 rounded-xl p-6 text-left">
+            <h2 className="text-center text-lg font-bold">Your Workspaces</h2>
+            <div className="space-y-2">
+              {existingWorkspaces.map((ws) => (
+                <Link
+                  key={ws.id}
+                  href={`/workspace/${ws.slug}`}
+                  className="border-card-hover hover:border-accent hover:text-accent flex items-center justify-between rounded-lg border px-4 py-3 transition-colors"
+                >
+                  <span className="font-medium">{ws.name}</span>
+                  <span className="text-silver text-sm">&rarr;</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
-          <h1 className="mb-2 text-3xl font-bold">Get Started</h1>
+          <h1 className="mb-2 text-3xl font-bold">
+            {existingWorkspaces.length > 0 ? "Add Another Workspace" : "Get Started"}
+          </h1>
           <p className="text-silver text-sm">Create a new workspace or join one with a code</p>
         </div>
 
