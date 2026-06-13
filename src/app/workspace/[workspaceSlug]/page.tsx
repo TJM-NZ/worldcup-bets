@@ -14,6 +14,8 @@ export default function WorkspaceDashboard() {
   const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
   const [memberCount, setMemberCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -56,7 +58,7 @@ export default function WorkspaceDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [workspace.id]);
+  }, [workspace.id, refreshKey]);
 
   // Load user's bets
   useEffect(() => {
@@ -75,6 +77,16 @@ export default function WorkspaceDashboard() {
       });
   }, [member.id]);
 
+  async function handleForceSync() {
+    setSyncing(true);
+    try {
+      await fetch("/api/sync/force", { method: "POST" });
+      setRefreshKey((k) => k + 1);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   const liveMatches = matches.filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED");
   const upcoming = matches.filter((m) => m.status === "TIMED" || m.status === "SCHEDULED");
 
@@ -82,17 +94,41 @@ export default function WorkspaceDashboard() {
     <div className="space-y-8">
       {/* Workspace header */}
       <div className="bg-card rounded-xl p-6">
-        <h1 className="text-3xl font-bold">
-          <span className="text-accent">{workspace.name}</span>
-        </h1>
-        <div className="text-silver mt-2 flex items-center gap-4 text-sm">
-          <span>
-            {memberCount} {memberCount === 1 ? "player" : "players"}
-          </span>
-          <span className="text-card-hover">|</span>
-          <span className="flex items-center gap-1.5">
-            You: <GemBadge gems={member.gems} size="sm" />
-          </span>
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">
+              <span className="text-accent">{workspace.name}</span>
+            </h1>
+            <div className="text-silver mt-2 flex items-center gap-4 text-sm">
+              <span>
+                {memberCount} {memberCount === 1 ? "player" : "players"}
+              </span>
+              <span className="text-card-hover">|</span>
+              <span className="flex items-center gap-1.5">
+                You: <GemBadge gems={member.gems} size="sm" />
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={handleForceSync}
+            disabled={syncing}
+            className="text-silver hover:text-accent disabled:text-silver/50 rounded-lg p-2 transition-colors"
+            title="Force refresh match data"
+          >
+            <svg
+              className={`h-5 w-5 ${syncing ? "animate-spin" : ""}`}
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+          </button>
         </div>
       </div>
 
