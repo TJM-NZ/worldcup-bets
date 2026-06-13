@@ -5,7 +5,6 @@ import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
-import Leaderboard from "@/components/Leaderboard";
 import GemBadge from "@/components/GemBadge";
 
 export default function WorkspaceDashboard() {
@@ -170,11 +169,6 @@ export default function WorkspaceDashboard() {
             No upcoming matches. Trigger a sync to load data.
           </p>
         )}
-      </section>
-
-      <section data-tour="leaderboard-section">
-        <h2 className="mb-3 text-xl font-bold">Leaderboard</h2>
-        <Leaderboard workspaceId={workspace.id} currentMemberId={member.id} />
       </section>
     </div>
   );
