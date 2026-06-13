@@ -33,10 +33,10 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
 
   return (
     <>
-      <header className="flex items-center justify-between px-6 py-4">
+      <header className="bg-background sticky top-0 z-10 flex items-center justify-between px-6 py-4">
         <span className="flex items-center gap-2 text-xl font-bold">
           <span className="text-lg">⚽</span>
-          <span className="text-accent">Office</span>Bets
+          Office<span className="text-accent">Bets</span>
         </span>
         {isAuthenticated ? (
           <Link
@@ -106,20 +106,12 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
                 Go to Dashboard
               </Link>
             ) : (
-              <>
-                <Link
-                  href="/signup"
-                  className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
-                >
-                  Join the initiative
-                </Link>
-                <Link
-                  href="/login"
-                  className="border-card-hover hover:border-accent hover:text-accent block w-full rounded-lg border-2 px-4 py-4 text-center font-bold transition-colors"
-                >
-                  Log in
-                </Link>
-              </>
+              <Link
+                href="/signup"
+                className="bg-accent hover:bg-accent-hover block w-full rounded-lg px-4 py-4 text-center font-bold text-white transition-colors"
+              >
+                Join the initiative
+              </Link>
             )}
           </div>
 
