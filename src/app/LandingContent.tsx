@@ -64,13 +64,19 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
             </div>
 
             <div>
-              <p className="text-accent/70 mb-2 text-xs font-semibold tracking-widest uppercase">
+              <h1 className="mb-2 text-4xl leading-tight font-bold tracking-tight">
+                <span className="text-white">Office</span>
+                <span className="text-accent">Bets</span>
+              </h1>
+              <p className="text-accent/70 mb-4 text-xs font-semibold tracking-widest uppercase">
                 FIFA World Cup 2026
               </p>
-              <h1 className="text-4xl leading-tight font-bold tracking-tight">
-                Not gambling.{" "}
-                <span className="text-accent">(Officially a team engagement activity.)</span>
-              </h1>
+              <p className="text-left text-4xl leading-tight font-bold tracking-tight">
+                Not gambling.
+              </p>
+              <p className="text-accent text-left text-3xl leading-tight font-bold tracking-tight">
+                (Officially a team engagement activity.)
+              </p>
             </div>
 
             <p className="text-silver mx-auto max-w-sm text-base leading-relaxed">
