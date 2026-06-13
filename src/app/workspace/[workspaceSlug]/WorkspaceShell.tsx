@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import WorkspaceNav from "@/components/WorkspaceNav";
+import { TourProvider } from "@/components/Tour";
 import { Workspace, Member } from "@/lib/types";
 
 export default function WorkspaceShell({
@@ -45,10 +46,14 @@ export default function WorkspaceShell({
 
   return (
     <WorkspaceProvider workspace={workspace} member={member}>
-      <div className="flex flex-1 flex-col">
-        <WorkspaceNav />
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 sm:pb-6">{children}</main>
-      </div>
+      <TourProvider>
+        <div className="flex flex-1 flex-col">
+          <WorkspaceNav />
+          <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 pb-20 sm:pb-6">
+            {children}
+          </main>
+        </div>
+      </TourProvider>
     </WorkspaceProvider>
   );
 }

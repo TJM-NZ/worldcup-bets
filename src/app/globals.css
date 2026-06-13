@@ -1,18 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0f172a;
-  --foreground: #e2e8f0;
-  --card: #1e293b;
-  --card-hover: #334155;
-  --accent: #8b5cf6;
-  --accent-hover: #7c3aed;
-  --gold: #fbbf24;
-  --silver: #94a3b8;
-  --bronze: #d97706;
-  --success: #22c55e;
-  --danger: #ef4444;
-  --gem: #8b5cf6;
+  --background: #0b1a0d;
+  --foreground: #e8f0e0;
+  --card: #152218;
+  --card-hover: #1e3323;
+  --accent: #c9a227;
+  --accent-hover: #a8861e;
+  --gold: #ffd700;
+  --silver: #8dafb0;
+  --bronze: #cd7f32;
+  --success: #4caf50;
+  --danger: #e63946;
+  --gem: #c9a227;
 }
 
 @theme inline {
@@ -34,6 +34,8 @@
 
 body {
   background: var(--background);
+  background-image: radial-gradient(ellipse at 50% 0%, #1a3520 0%, var(--background) 65%);
+  min-height: 100vh;
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
