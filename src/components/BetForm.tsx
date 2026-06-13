@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Match, Team, Prediction } from "@/lib/types";
-import { isDrawAvailable, calculateOdds } from "@/lib/betting";
+import { isDrawAvailable, calculateOdds, calculateProbabilities } from "@/lib/betting";
 import GemBadge from "./GemBadge";
 
 interface BetFormProps {
@@ -32,8 +32,9 @@ export default function BetForm({
   const showDraw = isDrawAvailable(match.stage);
   const maxGems = memberGems;
 
-  // Calculate odds from current pools, and preview odds including user's wager
+  // Calculate odds/probabilities from current pools, and preview odds including user's wager
   const currentOdds = calculateOdds(pools);
+  const currentProbs = calculateProbabilities(pools);
   const previewPools: Record<Prediction, number> = prediction
     ? { ...pools, [prediction]: pools[prediction] + gems }
     : pools;
@@ -99,6 +100,7 @@ export default function BetForm({
       >
         {options.map((opt) => {
           const mult = currentOdds[opt.value];
+          const prob = currentProbs[opt.value];
           return (
             <button
               key={opt.value}
@@ -111,8 +113,9 @@ export default function BetForm({
               }`}
             >
               <span className="font-semibold">{opt.label}</span>
+              {prob != null && <span className="mt-0.5 block text-sm font-bold">{prob}%</span>}
               {mult != null && (
-                <span className="text-silver mt-0.5 block text-xs">{mult.toFixed(1)}x</span>
+                <span className="text-silver block text-xs">{mult.toFixed(1)}x</span>
               )}
             </button>
           );

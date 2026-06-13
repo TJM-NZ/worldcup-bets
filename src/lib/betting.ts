@@ -93,6 +93,22 @@ export function calculateOdds(
 }
 
 /**
+ * Calculate implied crowd probabilities from pool data.
+ * Probability = outcomePool / totalPool (expressed as whole-number %)
+ */
+export function calculateProbabilities(
+  pools: Record<Prediction, number>
+): Record<Prediction, number | null> {
+  const total = pools.HOME + pools.AWAY + pools.DRAW;
+  if (total === 0) return { HOME: null, AWAY: null, DRAW: null };
+  return {
+    HOME: Math.round((pools.HOME / total) * 100),
+    AWAY: Math.round((pools.AWAY / total) * 100),
+    DRAW: Math.round((pools.DRAW / total) * 100),
+  };
+}
+
+/**
  * Check if a match is still open for betting.
  * Bets lock when status changes from TIMED/SCHEDULED.
  */

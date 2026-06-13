@@ -5,13 +5,17 @@ import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
+import NextUpStrip from "@/components/NextUpStrip";
+import GroupStandings from "@/components/GroupStandings";
+
+type Filter = "all" | "upcoming" | "live" | "finished" | "standings";
 
 export default function MatchesPage() {
   const { workspace, member } = useWorkspace();
   const [matches, setMatches] = useState<Match[]>([]);
   const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
-  const [filter, setFilter] = useState<"all" | "upcoming" | "live" | "finished">("all");
+  const [filter, setFilter] = useState<Filter>("all");
 
   useEffect(() => {
     const supabase = createClient();
@@ -72,7 +76,7 @@ export default function MatchesPage() {
     }
   });
 
-  // Group by stage
+  // Group by stage (only used for match list views)
   const grouped = new Map<string, Match[]>();
   for (const m of filtered) {
     const key = m.group_name || m.stage.replace(/_/g, " ");
@@ -80,11 +84,14 @@ export default function MatchesPage() {
     grouped.get(key)!.push(m);
   }
 
-  const filters = [
-    { value: "all" as const, label: "All" },
-    { value: "upcoming" as const, label: "Upcoming" },
-    { value: "live" as const, label: "Live" },
-    { value: "finished" as const, label: "Finished" },
+  const showNextUp = filter === "all" || filter === "upcoming" || filter === "live";
+
+  const filters: { value: Filter; label: string }[] = [
+    { value: "all", label: "All" },
+    { value: "upcoming", label: "Upcoming" },
+    { value: "live", label: "Live" },
+    { value: "finished", label: "Finished" },
+    { value: "standings", label: "Standings" },
   ];
 
   return (
@@ -108,25 +115,37 @@ export default function MatchesPage() {
         </div>
       </div>
 
-      {[...grouped.entries()].map(([stage, stageMatches]) => (
-        <section key={stage}>
-          <h2 className="text-silver mb-2 text-lg font-semibold">{stage}</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {stageMatches.map((m) => (
-              <MatchCard
-                key={m.id}
-                match={m}
-                homeTeam={teams.get(m.home_team_id!) || null}
-                awayTeam={teams.get(m.away_team_id!) || null}
-                workspaceSlug={workspace.slug}
-                userBet={bets.get(m.id) || null}
-              />
-            ))}
-          </div>
-        </section>
-      ))}
+      {filter === "standings" ? (
+        <GroupStandings matches={matches} teams={teams} />
+      ) : (
+        <>
+          {showNextUp && (
+            <NextUpStrip matches={matches} teams={teams} workspaceSlug={workspace.slug} />
+          )}
 
-      {filtered.length === 0 && <p className="text-silver py-8 text-center">No matches found</p>}
+          {[...grouped.entries()].map(([stage, stageMatches]) => (
+            <section key={stage}>
+              <h2 className="text-silver mb-2 text-lg font-semibold">{stage}</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {stageMatches.map((m) => (
+                  <MatchCard
+                    key={m.id}
+                    match={m}
+                    homeTeam={teams.get(m.home_team_id!) || null}
+                    awayTeam={teams.get(m.away_team_id!) || null}
+                    workspaceSlug={workspace.slug}
+                    userBet={bets.get(m.id) || null}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+
+          {filtered.length === 0 && (
+            <p className="text-silver py-8 text-center">No matches found</p>
+          )}
+        </>
+      )}
     </div>
   );
 }
