@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
+import NotificationBell from "./NotificationBell";
 import PointsBadge from "./PointsBadge";
 import { useTour } from "./Tour";
 
@@ -295,6 +296,7 @@ export default function WorkspaceNav() {
               })}
             </div>
             <div className="flex items-center gap-3">
+              <NotificationBell />
               <span data-tour="gem-balance">
                 <PointsBadge points={member.points} />
               </span>
@@ -311,9 +313,12 @@ export default function WorkspaceNav() {
             isAdmin={isAdmin}
             onSignOut={handleSignOut}
           />
-          <span data-tour="gem-balance">
-            <PointsBadge points={member.points} />
-          </span>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <span data-tour="gem-balance">
+              <PointsBadge points={member.points} />
+            </span>
+          </div>
         </div>
       </nav>
 

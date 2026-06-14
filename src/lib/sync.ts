@@ -116,7 +116,32 @@ async function resolveMatch(
   if (!winner) return 0;
 
   const supabase = createServiceClient();
+
+  // Fetch team names for notification messages
+  const { data: matchRow } = await supabase
+    .from("matches")
+    .select("home_team_id, away_team_id")
+    .eq("id", matchId)
+    .single();
+  const teamIds = [matchRow?.home_team_id, matchRow?.away_team_id].filter(Boolean) as number[];
+  const { data: teams } = await supabase.from("teams").select("id, tla").in("id", teamIds);
+  const teamsMap = new Map(teams?.map((t) => [t.id, t.tla]) ?? []);
+  const homeTla = (matchRow?.home_team_id && teamsMap.get(matchRow.home_team_id)) || "Home";
+  const awayTla = (matchRow?.away_team_id && teamsMap.get(matchRow.away_team_id)) || "Away";
+  const matchLabel = `${homeTla} vs ${awayTla}`;
+  const scoreLabel = `${homeScore}–${awayScore}`;
+  const predLabel = (pred: string) =>
+    pred === "HOME" ? homeTla : pred === "AWAY" ? awayTla : "Draw";
+
   let totalResolved = 0;
+  const notifRows: {
+    member_id: string;
+    type: string;
+    title: string;
+    body: string;
+    match_id: number;
+    points_delta: number;
+  }[] = [];
 
   // Resolve result bets (+3 correct, 0 wrong)
   const { data: bets } = await supabase
@@ -134,6 +159,17 @@ async function resolveMatch(
         p_amount: points_won,
       });
     }
+    notifRows.push({
+      member_id: bet.member_id,
+      type: points_won > 0 ? "bet_won" : "bet_lost",
+      title: points_won > 0 ? `+${points_won} pts` : "No points",
+      body:
+        points_won > 0
+          ? `Your ${predLabel(bet.prediction)} pick on ${matchLabel} paid off! (${scoreLabel})`
+          : `Your ${predLabel(bet.prediction)} pick on ${matchLabel} didn't pay off (${scoreLabel})`,
+      match_id: matchId,
+      points_delta: points_won,
+    });
     totalResolved++;
   }
 
@@ -154,7 +190,21 @@ async function resolveMatch(
         p_amount: points_won,
       });
     }
+    notifRows.push({
+      member_id: bet.member_id,
+      type: correct ? "score_bet_won" : "score_bet_lost",
+      title: correct ? `+${points_won} pts` : "No points",
+      body: correct
+        ? `Exact score! You predicted ${bet.predicted_home}–${bet.predicted_away} on ${matchLabel}`
+        : `You predicted ${bet.predicted_home}–${bet.predicted_away} on ${matchLabel} (result: ${scoreLabel})`,
+      match_id: matchId,
+      points_delta: points_won,
+    });
     totalResolved++;
+  }
+
+  if (notifRows.length > 0) {
+    await supabase.from("notifications").insert(notifRows);
   }
 
   return totalResolved;
