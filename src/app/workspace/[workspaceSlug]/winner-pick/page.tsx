@@ -45,8 +45,8 @@ export default function WinnerPickPage() {
       <div>
         <h1 className="text-2xl font-bold">Tournament Winner Pick</h1>
         <p className="text-silver mt-1 text-sm">
-          Pick who you think will win the World Cup. Correct pick = +500 bonus gems. Pick locks when
-          the first knockout match starts.
+          Pick who you think will win the World Cup. Correct pick = +10 bonus points. Pick locks
+          when the first knockout match starts.
         </p>
       </div>
 
@@ -61,8 +61,8 @@ export default function WinnerPickPage() {
             <div>
               <p className="text-xl font-bold">{pick.team?.name || "Unknown Team"}</p>
               {pick.resolved && (
-                <p className={pick.gems_won > 0 ? "text-success font-bold" : "text-danger"}>
-                  {pick.gems_won > 0 ? `+${pick.gems_won} gems!` : "Not the winner"}
+                <p className={pick.points_won > 0 ? "text-success font-bold" : "text-danger"}>
+                  {pick.points_won > 0 ? `+${pick.points_won} pts` : "Not the winner"}
                 </p>
               )}
               {!pick.resolved && <p className="text-silver text-sm">Awaiting tournament result</p>}

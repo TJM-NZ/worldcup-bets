@@ -14,19 +14,14 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { memberId, matchId, prediction, gemsWagered } = body as {
+  const { memberId, matchId, prediction } = body as {
     memberId: string;
     matchId: number;
     prediction: Prediction;
-    gemsWagered: number;
   };
 
-  if (!memberId || !matchId || !prediction || !gemsWagered) {
+  if (!memberId || !matchId || !prediction) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  if (gemsWagered < 10) {
-    return NextResponse.json({ error: "Minimum wager is 10 gems" }, { status: 400 });
   }
 
   if (!["HOME", "AWAY", "DRAW"].includes(prediction)) {
@@ -62,12 +57,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Betting is closed for this match" }, { status: 400 });
   }
 
-  // Extra check: don't allow bets if match time has passed
   if (new Date(match.utc_date) <= new Date()) {
     return NextResponse.json({ error: "Match has already started" }, { status: 400 });
   }
 
-  // Check draw availability
   if (prediction === "DRAW" && !isDrawAvailable(match.stage)) {
     return NextResponse.json(
       { error: "Draw prediction not available for knockout matches" },
@@ -87,34 +80,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "You already placed a bet on this match" }, { status: 400 });
   }
 
-  // Deduct gems atomically
-  const { data: deducted } = await supabase.rpc("decrement_gems", {
-    p_member_id: memberId,
-    p_amount: gemsWagered,
-  });
-
-  if (!deducted) {
-    return NextResponse.json({ error: "Insufficient gems" }, { status: 400 });
-  }
-
-  // Place bet
   const { data: bet, error: betError } = await supabase
     .from("bets")
-    .insert({
-      member_id: memberId,
-      match_id: matchId,
-      prediction,
-      gems_wagered: gemsWagered,
-    })
+    .insert({ member_id: memberId, match_id: matchId, prediction })
     .select()
     .single();
 
   if (betError) {
-    // Refund gems if bet insert fails
-    await supabase.rpc("increment_gems", {
-      p_member_id: memberId,
-      p_amount: gemsWagered,
-    });
     return NextResponse.json(
       { error: `Failed to place bet: ${betError.message}` },
       { status: 500 }

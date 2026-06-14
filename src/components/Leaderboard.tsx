@@ -2,22 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import GemBadge from "./GemBadge";
+import PointsBadge from "./PointsBadge";
 
 interface LeaderboardEntry {
   id: string;
   display_name: string;
-  gems: number;
+  points: number;
   crestUrl?: string;
   teamName?: string;
-  // Games: based on prediction correctness (all bets)
   gamesWon: number;
   gamesLost: number;
   gamesPending: number;
-  // Gems: based on gem profit (resolved bets only)
-  gemWins: number;
-  gemDraws: number;
-  gemLosses: number;
+  exactScoreWins: number;
 }
 
 function pct(num: number, denom: number): string | null {
@@ -40,9 +36,8 @@ export default function Leaderboard({
     async function load() {
       const { data: memberData } = await supabase
         .from("members")
-        .select("id, display_name, gems, winner_picks(teams(crest_url, name))")
-        .eq("workspace_id", workspaceId)
-        .order("gems", { ascending: false });
+        .select("id, display_name, points, winner_picks(teams(crest_url, name))")
+        .eq("workspace_id", workspaceId);
 
       if (!memberData) return;
 
@@ -52,53 +47,68 @@ export default function Leaderboard({
         gamesWon: number;
         gamesLost: number;
         gamesPending: number;
-        gemWins: number;
-        gemDraws: number;
-        gemLosses: number;
+        exactScoreWins: number;
       };
 
       const stats: Record<string, BetStats> = Object.fromEntries(
         memberIds.map((id) => [
           id,
-          { gamesWon: 0, gamesLost: 0, gamesPending: 0, gemWins: 0, gemDraws: 0, gemLosses: 0 },
+          { gamesWon: 0, gamesLost: 0, gamesPending: 0, exactScoreWins: 0 },
         ])
       );
 
       if (memberIds.length > 0) {
         const { data: bets } = await supabase
           .from("bets")
-          .select("member_id, gems_wagered, gems_won, resolved")
+          .select("member_id, points_won, resolved")
           .in("member_id", memberIds);
 
         for (const bet of bets ?? []) {
           const s = stats[bet.member_id];
           if (!s) continue;
-
           if (!bet.resolved) {
             s.gamesPending++;
-          } else if (bet.gems_won > 0) {
+          } else if (bet.points_won > 0) {
             s.gamesWon++;
-            if (bet.gems_won > bet.gems_wagered) s.gemWins++;
-            else s.gemDraws++;
           } else {
             s.gamesLost++;
-            s.gemLosses++;
+          }
+        }
+
+        const { data: scoreBets } = await supabase
+          .from("exact_score_bets")
+          .select("member_id, points_won, resolved")
+          .in("member_id", memberIds);
+
+        for (const bet of scoreBets ?? []) {
+          const s = stats[bet.member_id];
+          if (!s) continue;
+          if (bet.resolved && bet.points_won > 0) {
+            s.exactScoreWins++;
           }
         }
       }
 
-      setMembers(
-        memberData.map((m) => {
-          const pick = Array.isArray(m.winner_picks) ? m.winner_picks[0] : m.winner_picks;
-          const team = pick?.teams as { crest_url?: string; name?: string } | null | undefined;
-          return {
-            ...m,
-            ...stats[m.id],
-            crestUrl: team?.crest_url ?? undefined,
-            teamName: team?.name ?? undefined,
-          };
-        })
-      );
+      const entries = memberData.map((m) => {
+        const pick = Array.isArray(m.winner_picks) ? m.winner_picks[0] : m.winner_picks;
+        const team = pick?.teams as { crest_url?: string; name?: string } | null | undefined;
+        return {
+          ...m,
+          ...stats[m.id],
+          crestUrl: team?.crest_url ?? undefined,
+          teamName: team?.name ?? undefined,
+        };
+      });
+
+      entries.sort((a, b) => {
+        if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+        const aRate = a.gamesWon + a.gamesLost > 0 ? a.gamesWon / (a.gamesWon + a.gamesLost) : -1;
+        const bRate = b.gamesWon + b.gamesLost > 0 ? b.gamesWon / (b.gamesWon + b.gamesLost) : -1;
+        if (bRate !== aRate) return bRate - aRate;
+        return b.points - a.points;
+      });
+
+      setMembers(entries);
     }
 
     load();
@@ -116,6 +126,9 @@ export default function Leaderboard({
         () => load()
       )
       .on("postgres_changes", { event: "*", schema: "public", table: "bets" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "exact_score_bets" }, () =>
+        load()
+      )
       .subscribe();
 
     return () => {
@@ -128,11 +141,8 @@ export default function Leaderboard({
   return (
     <div className="space-y-2">
       {members.map((member, i) => {
-        const totalGames = member.gamesWon + member.gamesLost + member.gamesPending;
         const resolvedGames = member.gamesWon + member.gamesLost;
-        const resolvedGems = member.gemWins + member.gemDraws + member.gemLosses;
-        const gameWinRate = pct(member.gamesWon, resolvedGames);
-        const gemWinRate = pct(member.gemWins, resolvedGems);
+        const winRate = pct(member.gamesWon, resolvedGames);
 
         return (
           <div
@@ -164,40 +174,29 @@ export default function Leaderboard({
                   )}
                 </span>
               </span>
-              <GemBadge gems={member.gems} size="sm" />
+              <PointsBadge points={member.points} size="sm" />
             </div>
 
-            {totalGames > 0 && (
+            {member.gamesWon + member.gamesLost + member.gamesPending > 0 && (
               <div className="mt-2 ml-11 flex flex-wrap gap-x-4 gap-y-1 text-xs">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-silver font-medium">Games</span>
+                  <span className="text-silver font-medium">Picks</span>
                   <span className="text-emerald-500 dark:text-emerald-400">{member.gamesWon}W</span>
                   <span className="text-red-500 dark:text-red-400">{member.gamesLost}L</span>
                   {member.gamesPending > 0 && (
                     <span className="text-silver">{member.gamesPending}P</span>
                   )}
-                  {gameWinRate && (
+                  {winRate && (
                     <>
                       <span className="text-silver">·</span>
-                      <span className="text-silver">{gameWinRate}</span>
+                      <span className="text-silver">{winRate}</span>
                     </>
                   )}
                 </div>
-
-                {resolvedGems > 0 && (
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-silver font-medium">Gems</span>
-                    <span className="text-emerald-500 dark:text-emerald-400">
-                      {member.gemWins}W
-                    </span>
-                    <span className="text-red-500 dark:text-red-400">{member.gemLosses}L</span>
-                    {member.gemDraws > 0 && <span className="text-silver">{member.gemDraws}D</span>}
-                    {gemWinRate && (
-                      <>
-                        <span className="text-silver">·</span>
-                        <span className="text-silver">{gemWinRate}</span>
-                      </>
-                    )}
+                {member.exactScoreWins > 0 && (
+                  <div className="flex items-center gap-1">
+                    <span className="text-accent">★</span>
+                    <span className="text-silver">{member.exactScoreWins} exact</span>
                   </div>
                 )}
               </div>

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "OfficeBets",
-  description: "Office World Cup betting pool - wager gems on match outcomes",
+  description: "Office World Cup prediction pool - pick results and earn points",
 };
 
 export default function RootLayout({

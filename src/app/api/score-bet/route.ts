@@ -13,20 +13,15 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { memberId, matchId, predictedHome, predictedAway, gemsWagered } = body as {
+  const { memberId, matchId, predictedHome, predictedAway } = body as {
     memberId: string;
     matchId: number;
     predictedHome: number;
     predictedAway: number;
-    gemsWagered: number;
   };
 
-  if (!memberId || !matchId || predictedHome == null || predictedAway == null || !gemsWagered) {
+  if (!memberId || !matchId || predictedHome == null || predictedAway == null) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
-  }
-
-  if (gemsWagered < 10) {
-    return NextResponse.json({ error: "Minimum wager is 10 gems" }, { status: 400 });
   }
 
   if (
@@ -40,7 +35,6 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
-  // Verify the memberId belongs to the authenticated user
   const { data: member } = await supabase
     .from("members")
     .select("id")
@@ -52,7 +46,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  // Verify match exists and is open for betting
   const { data: match, error: matchError } = await supabase
     .from("matches")
     .select("id, status, utc_date")
@@ -71,7 +64,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Match has already started" }, { status: 400 });
   }
 
-  // Check for existing exact score bet
   const { data: existingBet } = await supabase
     .from("exact_score_bets")
     .select("id")
@@ -86,17 +78,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Deduct gems atomically
-  const { data: deducted } = await supabase.rpc("decrement_gems", {
-    p_member_id: memberId,
-    p_amount: gemsWagered,
-  });
-
-  if (!deducted) {
-    return NextResponse.json({ error: "Insufficient gems" }, { status: 400 });
-  }
-
-  // Place bet
   const { data: bet, error: betError } = await supabase
     .from("exact_score_bets")
     .insert({
@@ -104,16 +85,11 @@ export async function POST(request: Request) {
       match_id: matchId,
       predicted_home: predictedHome,
       predicted_away: predictedAway,
-      gems_wagered: gemsWagered,
     })
     .select()
     .single();
 
   if (betError) {
-    await supabase.rpc("increment_gems", {
-      p_member_id: memberId,
-      p_amount: gemsWagered,
-    });
     return NextResponse.json(
       { error: `Failed to place bet: ${betError.message}` },
       { status: 500 }

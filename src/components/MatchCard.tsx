@@ -12,8 +12,7 @@ interface MatchCardProps {
   workspaceSlug: string;
   userBet?: {
     prediction: string;
-    gems_wagered: number;
-    gems_won: number;
+    points_won: number;
     resolved: boolean;
   } | null;
 }
@@ -96,14 +95,15 @@ export default function MatchCard({
         <div
           className={`mt-2 rounded px-2 py-1 text-xs ${
             userBet.resolved
-              ? userBet.gems_won > 0
+              ? userBet.points_won > 0
                 ? "bg-success/20 text-success"
                 : "bg-danger/20 text-danger"
               : "bg-accent/20 text-accent"
           }`}
         >
-          Your bet: {userBet.prediction} ({userBet.gems_wagered} gems)
-          {userBet.resolved && (userBet.gems_won > 0 ? ` → Won ${userBet.gems_won}` : " → Lost")}
+          Your pick: {userBet.prediction}
+          {userBet.resolved &&
+            (userBet.points_won > 0 ? ` → +${userBet.points_won} pts` : " → Miss")}
         </div>
       )}
     </Link>

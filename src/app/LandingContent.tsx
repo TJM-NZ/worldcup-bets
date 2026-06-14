@@ -117,16 +117,19 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
 
           {/* Feature pills */}
           <div className="flex flex-wrap justify-center gap-2">
-            {["Virtual gems", "Parimutuel payouts", "Live match updates", "Office leaderboard"].map(
-              (f) => (
-                <span
-                  key={f}
-                  className="border-card-hover text-silver rounded-full border px-3 py-1 text-xs"
-                >
-                  {f}
-                </span>
-              )
-            )}
+            {[
+              "Points-based scoring",
+              "Exact score bonuses",
+              "Live match updates",
+              "Office leaderboard",
+            ].map((f) => (
+              <span
+                key={f}
+                className="border-card-hover text-silver rounded-full border px-3 py-1 text-xs"
+              >
+                {f}
+              </span>
+            ))}
           </div>
         </div>
       </main>

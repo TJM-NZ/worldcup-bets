@@ -12,7 +12,7 @@ export interface Member {
   workspace_id: string;
   user_id: string;
   display_name: string;
-  gems: number;
+  points: number;
   role: "admin" | "member";
   created_at: string;
 }
@@ -56,8 +56,7 @@ export interface Bet {
   member_id: string;
   match_id: number;
   prediction: Prediction;
-  gems_wagered: number;
-  gems_won: number;
+  points_won: number;
   resolved: boolean;
   created_at: string;
 }
@@ -68,8 +67,7 @@ export interface ExactScoreBet {
   match_id: number;
   predicted_home: number;
   predicted_away: number;
-  gems_wagered: number;
-  gems_won: number;
+  points_won: number;
   resolved: boolean;
   created_at: string;
 }
@@ -79,7 +77,7 @@ export interface WinnerPick {
   member_id: string;
   team_id: number;
   resolved: boolean;
-  gems_won: number;
+  points_won: number;
   created_at: string;
 }
 
@@ -131,7 +129,7 @@ export interface ExactScoreBetWithMember extends ExactScoreBet {
 export interface LeaderboardEntry {
   member_id: string;
   display_name: string;
-  gems: number;
+  points: number;
   total_bets: number;
   wins: number;
 }
