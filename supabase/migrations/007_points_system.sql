@@ -1,24 +1,54 @@
--- Migration: Replace gem wagering with fixed-points system
+-- Migration: Add points-based scoring alongside existing gems columns
+--
+-- ADDITIVE ONLY — no columns are dropped, no data is deleted.
+-- Backup tables snapshot the current state for rollback.
+-- Old gems/wagered columns remain and can be cleaned up later once confident.
 --
 -- Points: +3 correct result, +5 exact score, +10 tournament winner pick
--- Retroactively recalculate points for already-resolved bets.
--- Cancelled/postponed match bets are deleted (no penalty, match didn't happen).
 
 -- ============================================================
--- members: rename gems → points, reset to recalculate
+-- Snapshot current state into backup tables
+-- RLS enabled with no policies = inaccessible to API clients
 -- ============================================================
 
-ALTER TABLE public.members ADD COLUMN points integer NOT NULL DEFAULT 0;
-ALTER TABLE public.members DROP COLUMN gems;
+CREATE TABLE IF NOT EXISTS public.members_gems_backup AS
+  SELECT * FROM public.members;
+ALTER TABLE public.members_gems_backup ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.bets_gems_backup AS
+  SELECT * FROM public.bets;
+ALTER TABLE public.bets_gems_backup ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.exact_score_bets_gems_backup AS
+  SELECT * FROM public.exact_score_bets;
+ALTER TABLE public.exact_score_bets_gems_backup ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS public.winner_picks_gems_backup AS
+  SELECT * FROM public.winner_picks;
+ALTER TABLE public.winner_picks_gems_backup ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
--- bets: drop gems_wagered, rename gems_won → points_won
+-- members: add points column (gems kept intact)
 -- ============================================================
 
-ALTER TABLE public.bets DROP COLUMN gems_wagered;
-ALTER TABLE public.bets RENAME COLUMN gems_won TO points_won;
+ALTER TABLE public.members
+  ADD COLUMN IF NOT EXISTS points integer NOT NULL DEFAULT 0;
 
--- Retroactively set points_won for resolved bets
+-- ============================================================
+-- bets: relax gems_wagered constraint + add points_won
+-- New bets won't supply gems_wagered so NOT NULL must go
+-- ============================================================
+
+ALTER TABLE public.bets
+  ALTER COLUMN gems_wagered DROP NOT NULL;
+
+ALTER TABLE public.bets
+  DROP CONSTRAINT IF EXISTS bets_gems_wagered_check;
+
+ALTER TABLE public.bets
+  ADD COLUMN IF NOT EXISTS points_won integer NOT NULL DEFAULT 0;
+
+-- Backfill points_won for resolved bets
 UPDATE public.bets b
 SET points_won = CASE
   WHEN b.prediction = CASE m.winner
@@ -37,8 +67,14 @@ WHERE b.match_id = m.id
 -- exact_score_bets: same treatment
 -- ============================================================
 
-ALTER TABLE public.exact_score_bets DROP COLUMN gems_wagered;
-ALTER TABLE public.exact_score_bets RENAME COLUMN gems_won TO points_won;
+ALTER TABLE public.exact_score_bets
+  ALTER COLUMN gems_wagered DROP NOT NULL;
+
+ALTER TABLE public.exact_score_bets
+  DROP CONSTRAINT IF EXISTS exact_score_bets_gems_wagered_check;
+
+ALTER TABLE public.exact_score_bets
+  ADD COLUMN IF NOT EXISTS points_won integer NOT NULL DEFAULT 0;
 
 UPDATE public.exact_score_bets esb
 SET points_won = CASE
@@ -51,14 +87,14 @@ WHERE esb.match_id = m.id
   AND esb.resolved = true;
 
 -- ============================================================
--- winner_picks: rename gems_won → points_won
--- Existing correct picks (gems_won > 0) → 10 pts
+-- winner_picks: add points_won alongside gems_won
 -- ============================================================
 
-ALTER TABLE public.winner_picks RENAME COLUMN gems_won TO points_won;
+ALTER TABLE public.winner_picks
+  ADD COLUMN IF NOT EXISTS points_won integer NOT NULL DEFAULT 0;
 
 UPDATE public.winner_picks
-SET points_won = CASE WHEN resolved = true AND points_won > 0 THEN 10 ELSE 0 END;
+SET points_won = CASE WHEN resolved = true AND gems_won > 0 THEN 10 ELSE 0 END;
 
 -- ============================================================
 -- Recalculate member points from all resolved bets
@@ -80,11 +116,8 @@ SET points = (
 );
 
 -- ============================================================
--- Replace gem functions with points equivalent
+-- Add increment_points (increment_gems / decrement_gems kept)
 -- ============================================================
-
-DROP FUNCTION IF EXISTS public.increment_gems(uuid, integer);
-DROP FUNCTION IF EXISTS public.decrement_gems(uuid, integer);
 
 CREATE OR REPLACE FUNCTION public.increment_points(p_member_id uuid, p_amount integer)
 RETURNS void
