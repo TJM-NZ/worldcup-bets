@@ -1,3 +1,7 @@
+-- notifications table may already exist from a previous migration attempt.
+-- Drop and recreate cleanly — the feature was reverted before any data was written.
+DROP TABLE IF EXISTS notifications CASCADE;
+
 CREATE TABLE notifications (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   member_id uuid REFERENCES members(id) ON DELETE CASCADE NOT NULL,
