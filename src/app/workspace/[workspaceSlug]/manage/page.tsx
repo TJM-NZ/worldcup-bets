@@ -12,6 +12,7 @@ export default function ManagePage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
   useEffect(() => {
@@ -36,6 +37,27 @@ export default function ManagePage() {
     await navigator.clipboard.writeText(type === "code" ? inviteCode : inviteUrl);
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function deleteMember(target: Member) {
+    if (
+      !confirm(
+        `Remove ${target.display_name} from this workspace? This will also delete all their bets.`
+      )
+    )
+      return;
+    setDeleting(target.id);
+
+    const res = await fetch(`/api/workspace/${workspace.id}/members`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetMemberId: target.id }),
+    });
+
+    if (res.ok) {
+      setMembers((prev) => prev.filter((m) => m.id !== target.id));
+    }
+    setDeleting(null);
   }
 
   async function toggleRole(target: Member) {
@@ -143,11 +165,20 @@ export default function ManagePage() {
                   <PointsBadge points={m.points} />
                   <button
                     onClick={() => toggleRole(m)}
-                    disabled={updating === m.id || m.id === currentMember.id}
+                    disabled={updating === m.id || deleting === m.id || m.id === currentMember.id}
                     className="border-card-hover text-silver hover:text-foreground hover:border-accent/50 rounded-lg border px-3 py-1.5 text-sm transition-colors disabled:opacity-40"
                   >
                     {updating === m.id ? "..." : m.role === "admin" ? "Remove admin" : "Make admin"}
                   </button>
+                  {m.id !== currentMember.id && (
+                    <button
+                      onClick={() => deleteMember(m)}
+                      disabled={deleting === m.id || updating === m.id}
+                      className="rounded-lg border border-red-500/30 px-3 py-1.5 text-sm text-red-400 transition-colors hover:border-red-500/60 hover:text-red-300 disabled:opacity-40"
+                    >
+                      {deleting === m.id ? "..." : "Remove"}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
