@@ -99,7 +99,7 @@ function ChevronDownIcon({ className }: { className?: string }) {
 const primaryTabs = [
   { key: "", label: "Dashboard", icon: HomeIcon },
   { key: "/matches", label: "Matches", icon: CalendarIcon },
-  { key: "/leaderboard", label: "Board", icon: TrophyIcon },
+  { key: "/leaderboard", label: "Leaderboard", icon: TrophyIcon },
   { key: "/winner-pick", label: "Winner", icon: StarIcon },
 ] as const;
 
