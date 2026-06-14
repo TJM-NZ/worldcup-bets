@@ -31,9 +31,9 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("members")
-    .select("id, display_name, gems, role, created_at")
+    .select("id, display_name, points, role, created_at")
     .eq("workspace_id", workspaceId)
-    .order("gems", { ascending: false });
+    .order("points", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

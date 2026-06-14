@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
-import GemBadge from "@/components/GemBadge";
+import PointsBadge from "@/components/PointsBadge";
 
 export default function WorkspaceDashboard() {
   const { workspace, member } = useWorkspace();
@@ -104,7 +104,7 @@ export default function WorkspaceDashboard() {
               </span>
               <span className="text-card-hover">|</span>
               <span className="flex items-center gap-1.5">
-                You: <GemBadge gems={member.gems} size="sm" />
+                You: <PointsBadge points={member.points} size="sm" />
               </span>
             </div>
           </div>

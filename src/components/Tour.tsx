@@ -12,27 +12,27 @@ const TOUR_STEPS: TourStep[] = [
   {
     target: null,
     title: "Welcome to OfficeBets ⚽",
-    body: "Your office World Cup 2026 betting pool. Predict match results, wager gems, and climb the leaderboard. Let's show you around!",
+    body: "Your office World Cup 2026 prediction pool. Predict match results, earn points, and climb the leaderboard. Let's show you around!",
   },
   {
     target: "[data-tour='gem-balance']",
-    title: "Your Gems 💎",
-    body: "Gems are your betting currency. You start with 1,000. Win bets to grow your balance — lose and you shrink. Don't go broke!",
+    title: "Your Points ⭐",
+    body: "Points are your score. Earn +3 for every correct result prediction, +5 for nailing the exact score. Rack up as many as you can!",
   },
   {
     target: "[data-tour='nav-matches']",
-    title: "Place Your Bets",
-    body: "Head to Matches to see every game. Tap a match to pick the home team, away team, or a draw — then wager as many gems as you dare.",
+    title: "Place Your Predictions",
+    body: "Head to Matches to see every game. Tap a match to pick the home team, away team, or a draw. No wager needed — just pick correctly!",
   },
   {
     target: "[data-tour='nav-leaderboard']",
     title: "The Leaderboard",
-    body: "Your gem total determines your rank. Win more bets than everyone else to claim the top spot and ultimate bragging rights.",
+    body: "Most wins determines your rank. Pick more results correctly than everyone else to claim the top spot and ultimate bragging rights.",
   },
   {
     target: "[data-tour='winner-nav']",
     title: "Pick the Tournament Winner",
-    body: "Don't forget to predict the overall World Cup winner! Get it right and you'll earn a huge gem bonus when the trophy is lifted.",
+    body: "Don't forget to predict the overall World Cup winner! Get it right and you'll earn a 10 point bonus when the trophy is lifted.",
   },
   {
     target: "[data-tour='workspace-switcher']",

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Member } from "@/lib/types";
-import GemBadge from "@/components/GemBadge";
+import PointsBadge from "@/components/PointsBadge";
 
 export default function ManagePage() {
   const router = useRouter();
@@ -140,7 +140,7 @@ export default function ManagePage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <GemBadge gems={m.gems} />
+                  <PointsBadge points={m.points} />
                   <button
                     onClick={() => toggleRole(m)}
                     disabled={updating === m.id || m.id === currentMember.id}

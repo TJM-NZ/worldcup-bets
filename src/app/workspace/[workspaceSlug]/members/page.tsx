@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/hooks";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Member } from "@/lib/types";
-import GemBadge from "@/components/GemBadge";
+import PointsBadge from "@/components/PointsBadge";
 
 export default function MembersPage() {
   const { userId } = useAuth();
@@ -86,7 +86,7 @@ export default function MembersPage() {
             </div>
 
             <div className="flex items-center gap-3">
-              <GemBadge gems={m.gems} />
+              <PointsBadge points={m.points} />
               {isAdmin && (
                 <button
                   onClick={() => toggleRole(m)}

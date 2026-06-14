@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import GemBadge from "./GemBadge";
+import PointsBadge from "./PointsBadge";
 import { useTour } from "./Tour";
 
 function HomeIcon({ className }: { className?: string }) {
@@ -296,7 +296,7 @@ export default function WorkspaceNav() {
             </div>
             <div className="flex items-center gap-3">
               <span data-tour="gem-balance">
-                <GemBadge gems={member.gems} />
+                <PointsBadge points={member.points} />
               </span>
             </div>
           </div>
@@ -312,7 +312,7 @@ export default function WorkspaceNav() {
             onSignOut={handleSignOut}
           />
           <span data-tour="gem-balance">
-            <GemBadge gems={member.gems} />
+            <PointsBadge points={member.points} />
           </span>
         </div>
       </nav>

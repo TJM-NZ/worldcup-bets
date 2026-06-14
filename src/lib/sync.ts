@@ -1,6 +1,6 @@
 import { createServiceClient } from "./supabase/server";
 import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
-import { calculatePayouts, calculateExactScorePayout, winnerToPrediction } from "./betting";
+import { winnerToPrediction, RESULT_POINTS, EXACT_SCORE_POINTS } from "./betting";
 import { FdMatch } from "./types";
 
 /** Seed teams from football-data.org */
@@ -79,7 +79,7 @@ export async function syncMatches(): Promise<{
       m.score.fullTime.away !== null
   );
 
-  // Find newly postponed/cancelled matches (for refunds)
+  // Find newly postponed/cancelled matches (delete unresolved bets — no penalty)
   const newlyCancelled = apiMatches.filter(
     (m) =>
       (m.status === "POSTPONED" || m.status === "CANCELLED") &&
@@ -89,7 +89,6 @@ export async function syncMatches(): Promise<{
 
   let betsResolved = 0;
 
-  // Resolve finished matches
   for (const match of newlyFinished) {
     betsResolved += await resolveMatch(
       match.id,
@@ -99,15 +98,14 @@ export async function syncMatches(): Promise<{
     );
   }
 
-  // Refund cancelled/postponed
   for (const match of newlyCancelled) {
-    betsResolved += await refundMatch(match.id);
+    betsResolved += await cancelMatch(match.id);
   }
 
   return { matchesUpdated: rows.length, betsResolved };
 }
 
-/** Resolve bets for a finished match using parimutuel payout */
+/** Resolve bets for a finished match — fixed points, no parimutuel */
 async function resolveMatch(
   matchId: number,
   winnerRaw: string,
@@ -118,138 +116,87 @@ async function resolveMatch(
   if (!winner) return 0;
 
   const supabase = createServiceClient();
-
-  // Get all unresolved bets for this match
-  const { data: bets, error } = await supabase
-    .from("bets")
-    .select("id, member_id, prediction, gems_wagered")
-    .eq("match_id", matchId)
-    .eq("resolved", false);
-
-  if (error || !bets || bets.length === 0) return 0;
-
-  // Group bets by workspace
-  const { data: members } = await supabase
-    .from("members")
-    .select("id, workspace_id")
-    .in(
-      "id",
-      bets.map((b) => b.member_id)
-    );
-
-  if (!members) return 0;
-
-  const memberWorkspaceMap = new Map<string, string>();
-  for (const m of members) {
-    memberWorkspaceMap.set(m.id, m.workspace_id);
-  }
-
-  // Group bets by workspace
-  const workspaceBets = new Map<string, typeof bets>();
-  for (const bet of bets) {
-    const wsId = memberWorkspaceMap.get(bet.member_id);
-    if (!wsId) continue;
-    if (!workspaceBets.has(wsId)) workspaceBets.set(wsId, []);
-    workspaceBets.get(wsId)!.push(bet);
-  }
-
   let totalResolved = 0;
 
-  // Calculate payouts per workspace
-  for (const [, wsBets] of workspaceBets) {
-    const payouts = calculatePayouts(
-      wsBets.map((b) => ({
-        id: b.id,
-        member_id: b.member_id,
-        prediction: b.prediction as "HOME" | "AWAY" | "DRAW",
-        gems_wagered: b.gems_wagered,
-      })),
-      winner
-    );
-
-    // Update bets and member gems
-    for (const payout of payouts) {
-      await supabase
-        .from("bets")
-        .update({ resolved: true, gems_won: payout.gems_won })
-        .eq("id", payout.bet_id);
-
-      if (payout.gems_won > 0) {
-        await supabase.rpc("increment_gems", {
-          p_member_id: payout.member_id,
-          p_amount: payout.gems_won,
-        });
-      }
-
-      totalResolved++;
-    }
-  }
-
-  // Resolve exact score bets (fixed 5x odds)
-  const { data: scoreBets } = await supabase
-    .from("exact_score_bets")
-    .select("id, member_id, predicted_home, predicted_away, gems_wagered")
+  // Resolve result bets (+3 correct, 0 wrong)
+  const { data: bets } = await supabase
+    .from("bets")
+    .select("id, member_id, prediction")
     .eq("match_id", matchId)
     .eq("resolved", false);
 
-  for (const bet of scoreBets || []) {
-    const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
-    const gems_won = correct ? calculateExactScorePayout(bet.gems_wagered) : 0;
-
-    await supabase.from("exact_score_bets").update({ resolved: true, gems_won }).eq("id", bet.id);
-
-    if (gems_won > 0) {
-      await supabase.rpc("increment_gems", {
+  for (const bet of bets ?? []) {
+    const points_won = bet.prediction === winner ? RESULT_POINTS : 0;
+    await supabase.from("bets").update({ resolved: true, points_won }).eq("id", bet.id);
+    if (points_won > 0) {
+      await supabase.rpc("increment_points", {
         p_member_id: bet.member_id,
-        p_amount: gems_won,
+        p_amount: points_won,
       });
     }
+    totalResolved++;
+  }
 
+  // Resolve exact score bets (+5 if correct)
+  const { data: scoreBets } = await supabase
+    .from("exact_score_bets")
+    .select("id, member_id, predicted_home, predicted_away")
+    .eq("match_id", matchId)
+    .eq("resolved", false);
+
+  for (const bet of scoreBets ?? []) {
+    const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
+    const points_won = correct ? EXACT_SCORE_POINTS : 0;
+    await supabase.from("exact_score_bets").update({ resolved: true, points_won }).eq("id", bet.id);
+    if (points_won > 0) {
+      await supabase.rpc("increment_points", {
+        p_member_id: bet.member_id,
+        p_amount: points_won,
+      });
+    }
     totalResolved++;
   }
 
   return totalResolved;
 }
 
-/** Refund all bets on a postponed/cancelled match */
-async function refundMatch(matchId: number): Promise<number> {
+/** Delete unresolved bets for a cancelled/postponed match — no penalty */
+async function cancelMatch(matchId: number): Promise<number> {
   const supabase = createServiceClient();
   let total = 0;
 
   const { data: bets } = await supabase
     .from("bets")
-    .select("id, member_id, gems_wagered")
+    .select("id")
     .eq("match_id", matchId)
     .eq("resolved", false);
 
-  for (const bet of bets || []) {
+  if (bets && bets.length > 0) {
     await supabase
       .from("bets")
-      .update({ resolved: true, gems_won: bet.gems_wagered })
-      .eq("id", bet.id);
-    await supabase.rpc("increment_gems", {
-      p_member_id: bet.member_id,
-      p_amount: bet.gems_wagered,
-    });
-    total++;
+      .delete()
+      .in(
+        "id",
+        bets.map((b) => b.id)
+      );
+    total += bets.length;
   }
 
   const { data: scoreBets } = await supabase
     .from("exact_score_bets")
-    .select("id, member_id, gems_wagered")
+    .select("id")
     .eq("match_id", matchId)
     .eq("resolved", false);
 
-  for (const bet of scoreBets || []) {
+  if (scoreBets && scoreBets.length > 0) {
     await supabase
       .from("exact_score_bets")
-      .update({ resolved: true, gems_won: bet.gems_wagered })
-      .eq("id", bet.id);
-    await supabase.rpc("increment_gems", {
-      p_member_id: bet.member_id,
-      p_amount: bet.gems_wagered,
-    });
-    total++;
+      .delete()
+      .in(
+        "id",
+        scoreBets.map((b) => b.id)
+      );
+    total += scoreBets.length;
   }
 
   return total;
@@ -294,7 +241,6 @@ export async function shouldSync(): Promise<boolean> {
   const hasLive = todayMatches.some((m) => liveStatuses.includes(m.status));
 
   if (hasLive) {
-    // During live matches, sync every 60 seconds
     return secondsSinceSync >= 55;
   }
 
@@ -308,27 +254,22 @@ export async function shouldSync(): Promise<boolean> {
     const minutesUntilNext = nextMatchIn / (1000 * 60);
 
     if (minutesUntilNext <= 30) {
-      // Within 30 min of kickoff, sync every 60s
       return secondsSinceSync >= 55;
     }
 
-    // More than 30 min out, sync every 30 min
     return secondsSinceSync >= 1800;
   }
 
   // All matches finished today
   const allFinished = todayMatches.every((m) => m.status === "FINISHED");
   if (allFinished) {
-    // One final sync after all done, then idle
     const lastMatchEnd = Math.max(...todayMatches.map((m) => new Date(m.utc_date).getTime()));
-    // Sync once within 10 min after last match
     if (now.getTime() - lastMatchEnd < 600000 && secondsSinceSync > 300) {
       return true;
     }
     return false;
   }
 
-  // Default: sync every 30 min
   return secondsSinceSync >= 1800;
 }
 
@@ -337,7 +278,6 @@ export async function syncStandings(force = false): Promise<number> {
   const supabase = createServiceClient();
 
   if (!force) {
-    // Only call the API if standings are stale (>20h) or table is empty
     const { data: latest } = await supabase
       .from("group_standings")
       .select("updated_at")

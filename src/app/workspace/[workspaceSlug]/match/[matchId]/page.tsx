@@ -6,16 +6,10 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet, Prediction, ExactScoreBet, ExactScoreBetWithMember } from "@/lib/types";
-import {
-  isBettingOpen,
-  calculateOdds,
-  calculateProbabilities,
-  isDrawAvailable,
-} from "@/lib/betting";
+import { isBettingOpen, isDrawAvailable, RESULT_POINTS, EXACT_SCORE_POINTS } from "@/lib/betting";
 import BetForm from "@/components/BetForm";
 import ScoreBetForm from "@/components/ScoreBetForm";
 import CountdownTimer from "@/components/CountdownTimer";
-import GemBadge from "@/components/GemBadge";
 
 export default function MatchDetailPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = use(params);
@@ -30,7 +24,6 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
   const [allScoreBets, setAllScoreBets] = useState<ExactScoreBetWithMember[]>([]);
   const [fadeKey, setFadeKey] = useState(0);
   const [fadePrediction, setFadePrediction] = useState<Prediction | null>(null);
-  const [fadeGems, setFadeGems] = useState<number | null>(null);
   const betFormRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,13 +74,11 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
     };
   }, [matchId]);
 
-  // Load bets + subscribe to realtime changes
   useEffect(() => {
     const supabase = createClient();
     const matchIdNum = parseInt(matchId);
 
     async function loadBets() {
-      // User's own outcome bet
       const { data: myBet } = await supabase
         .from("bets")
         .select("*")
@@ -97,7 +88,6 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
 
       setUserBet(myBet);
 
-      // User's own exact score bet
       const { data: myScoreBet } = await supabase
         .from("exact_score_bets")
         .select("*")
@@ -107,7 +97,6 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
 
       setUserScoreBet(myScoreBet);
 
-      // All bets for this match from workspace members
       const { data: wsMembers } = await supabase
         .from("members")
         .select("id, display_name")
@@ -188,14 +177,12 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
   const isFinished = match.status === "FINISHED";
   const showDraw = isDrawAvailable(match.stage);
 
-  // Pool summary
-  const pools: Record<Prediction, number> = { HOME: 0, AWAY: 0, DRAW: 0 };
+  // Pick distribution (by count)
+  const pickCounts: Record<Prediction, number> = { HOME: 0, AWAY: 0, DRAW: 0 };
   for (const b of allBets) {
-    pools[b.prediction] += b.gems_wagered;
+    pickCounts[b.prediction]++;
   }
-  const totalPool = pools.HOME + pools.AWAY + pools.DRAW;
-  const odds = calculateOdds(pools);
-  const probabilities = calculateProbabilities(pools);
+  const totalPicks = pickCounts.HOME + pickCounts.AWAY + pickCounts.DRAW;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -268,7 +255,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
       </div>
 
       {/* Bet form or existing bet */}
-      {isOpen && !userBet && member.gems >= 10 && (
+      {isOpen && !userBet && (
         <div ref={betFormRef} className="bg-card rounded-xl p-6">
           <h3 className="mb-4 text-lg font-bold">
             {fadePrediction ? (
@@ -279,7 +266,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                 </span>
               </>
             ) : (
-              "Place Your Bet"
+              "Place Your Prediction"
             )}
           </h3>
           <BetForm
@@ -288,18 +275,9 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
             homeTeam={homeTeam}
             awayTeam={awayTeam}
             memberId={member.id}
-            memberGems={member.gems}
-            pools={pools}
             onBetPlaced={() => window.location.reload()}
             initialPrediction={fadePrediction ?? undefined}
-            initialGems={fadeGems ?? undefined}
           />
-        </div>
-      )}
-
-      {isOpen && !userBet && member.gems < 10 && (
-        <div className="bg-card rounded-xl p-6 text-center">
-          <p className="text-silver">You don&apos;t have enough gems to bet (minimum 10).</p>
         </div>
       )}
 
@@ -307,13 +285,13 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
         <div
           className={`rounded-xl p-6 ${
             userBet.resolved
-              ? userBet.gems_won > 0
+              ? userBet.points_won > 0
                 ? "bg-success/10 border-success/30 border"
                 : "bg-danger/10 border-danger/30 border"
               : "bg-accent/10 border-accent/30 border"
           }`}
         >
-          <h3 className="mb-2 font-bold">Your Bet</h3>
+          <h3 className="mb-2 font-bold">Your Prediction</h3>
           <div className="flex items-center justify-between">
             <span>
               {userBet.prediction === "HOME"
@@ -322,29 +300,31 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                   ? awayTeam?.name
                   : "Draw"}
             </span>
-            <div className="flex items-center gap-3">
-              <GemBadge gems={userBet.gems_wagered} size="sm" />
-              {userBet.resolved && (
-                <span className={userBet.gems_won > 0 ? "text-success font-bold" : "text-danger"}>
-                  {userBet.gems_won > 0 ? `+${userBet.gems_won}` : "Lost"}
-                </span>
-              )}
-            </div>
+            {userBet.resolved ? (
+              <span
+                className={`font-bold ${userBet.points_won > 0 ? "text-success" : "text-danger"}`}
+              >
+                {userBet.points_won > 0 ? `+${userBet.points_won} pts` : "Miss"}
+              </span>
+            ) : (
+              <span className="text-accent text-sm">+{RESULT_POINTS} pts if correct</span>
+            )}
           </div>
         </div>
       )}
 
       {/* Exact score betting */}
-      {isOpen && !userScoreBet && member.gems >= 10 && (
+      {isOpen && !userScoreBet && (
         <div className="bg-card rounded-xl p-6">
           <h3 className="mb-1 text-lg font-bold">Predict Exact Score</h3>
-          <p className="text-silver mb-4 text-sm">5× fixed payout if you nail it.</p>
+          <p className="text-silver mb-4 text-sm">
+            Nail the exact score for +{EXACT_SCORE_POINTS} bonus points.
+          </p>
           <ScoreBetForm
             match={match}
             homeTeam={homeTeam}
             awayTeam={awayTeam}
             memberId={member.id}
-            memberGems={member.gems}
             onBetPlaced={() => window.location.reload()}
           />
         </div>
@@ -354,95 +334,68 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
         <div
           className={`rounded-xl p-6 ${
             userScoreBet.resolved
-              ? userScoreBet.gems_won > 0
+              ? userScoreBet.points_won > 0
                 ? "bg-success/10 border-success/30 border"
                 : "bg-danger/10 border-danger/30 border"
               : "bg-accent/10 border-accent/30 border"
           }`}
         >
-          <h3 className="mb-2 font-bold">Your Score Bet</h3>
+          <h3 className="mb-2 font-bold">Your Score Prediction</h3>
           <div className="flex items-center justify-between">
-            <span>
+            <span className="font-mono">
               {homeTeam?.tla || "Home"} {userScoreBet.predicted_home}–{userScoreBet.predicted_away}{" "}
               {awayTeam?.tla || "Away"}
             </span>
-            <div className="flex items-center gap-3">
-              <GemBadge gems={userScoreBet.gems_wagered} size="sm" />
-              {userScoreBet.resolved && (
-                <span
-                  className={userScoreBet.gems_won > 0 ? "text-success font-bold" : "text-danger"}
-                >
-                  {userScoreBet.gems_won > 0 ? `+${userScoreBet.gems_won}` : "Lost"}
-                </span>
-              )}
-            </div>
+            {userScoreBet.resolved ? (
+              <span
+                className={`font-bold ${userScoreBet.points_won > 0 ? "text-success" : "text-danger"}`}
+              >
+                {userScoreBet.points_won > 0 ? `+${userScoreBet.points_won} pts` : "Miss"}
+              </span>
+            ) : (
+              <span className="text-accent text-sm">+{EXACT_SCORE_POINTS} pts if exact</span>
+            )}
           </div>
         </div>
       )}
 
-      {/* Pool summary */}
-      <div className="bg-card rounded-xl p-6">
-        <h3 className="mb-3 text-lg font-bold">Betting Pool</h3>
-        {totalPool > 0 ? (
+      {/* Pick distribution */}
+      {totalPicks > 0 && (
+        <div className="bg-card rounded-xl p-6">
+          <h3 className="mb-3 text-lg font-bold">Predictions</h3>
           <div className="space-y-2">
             {[
-              {
-                label: homeTeam?.tla || "Home",
-                pool: pools.HOME,
-                mult: odds.HOME,
-                prob: probabilities.HOME,
-                pred: "HOME" as Prediction,
-              },
-              {
-                label: awayTeam?.tla || "Away",
-                pool: pools.AWAY,
-                mult: odds.AWAY,
-                prob: probabilities.AWAY,
-                pred: "AWAY" as Prediction,
-              },
-              ...(showDraw
-                ? [
-                    {
-                      label: "Draw",
-                      pool: pools.DRAW,
-                      mult: odds.DRAW,
-                      prob: probabilities.DRAW,
-                      pred: "DRAW" as Prediction,
-                    },
-                  ]
-                : []),
-            ].map(({ label, pool, mult, prob }) => (
-              <div key={label} className="flex items-center gap-3">
-                <span className="text-silver w-16 text-sm">{label}</span>
-                <div className="bg-background h-4 flex-1 overflow-hidden rounded-full">
-                  <div
-                    className="bg-accent h-full rounded-full transition-all"
-                    style={{ width: totalPool > 0 ? `${(pool / totalPool) * 100}%` : "0%" }}
-                  />
+              { label: homeTeam?.tla || "Home", pred: "HOME" as Prediction },
+              { label: awayTeam?.tla || "Away", pred: "AWAY" as Prediction },
+              ...(showDraw ? [{ label: "Draw", pred: "DRAW" as Prediction }] : []),
+            ].map(({ label, pred }) => {
+              const count = pickCounts[pred];
+              const pct = Math.round((count / totalPicks) * 100);
+              return (
+                <div key={pred} className="flex items-center gap-3">
+                  <span className="text-silver w-16 text-sm">{label}</span>
+                  <div className="bg-background h-4 flex-1 overflow-hidden rounded-full">
+                    <div
+                      className="bg-accent h-full rounded-full transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="w-10 text-right text-sm font-semibold">{pct}%</span>
+                  <span className="text-silver w-8 text-right text-xs">{count}</span>
                 </div>
-                <span className="w-10 text-right text-sm font-semibold">
-                  {prob != null ? `${prob}%` : "—"}
-                </span>
-                <GemBadge gems={pool} size="sm" />
-                <span className="text-silver w-12 text-right text-xs">
-                  {mult != null ? `${mult.toFixed(1)}x` : "—"}
-                </span>
-              </div>
-            ))}
+              );
+            })}
             <p className="text-silver mt-2 text-sm">
-              Total pool: {totalPool} gems &middot; {allBets.length} bet
-              {allBets.length !== 1 ? "s" : ""}
+              {totalPicks} prediction{totalPicks !== 1 ? "s" : ""}
             </p>
           </div>
-        ) : (
-          <p className="text-silver text-sm">No bets yet — be the first!</p>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Individual bets */}
       {allBets.length > 0 && (
         <div className="bg-card rounded-xl p-6">
-          <h3 className="mb-3 text-lg font-bold">All Bets</h3>
+          <h3 className="mb-3 text-lg font-bold">All Predictions</h3>
           <div className="space-y-2">
             {allBets.map((bet) => {
               const canFade = isOpen && !userBet && bet.prediction !== "DRAW";
@@ -462,17 +415,15 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                           ? awayTeam?.tla
                           : "Draw"}
                     </span>
-                    <GemBadge gems={bet.gems_wagered} size="sm" />
                     {bet.resolved && (
-                      <span className={bet.gems_won > 0 ? "text-success" : "text-danger"}>
-                        {bet.gems_won > 0 ? `+${bet.gems_won}` : "Lost"}
+                      <span className={bet.points_won > 0 ? "text-success" : "text-danger"}>
+                        {bet.points_won > 0 ? `+${bet.points_won}` : "Miss"}
                       </span>
                     )}
                     {canFade && opposite && (
                       <button
                         onClick={() => {
                           setFadePrediction(opposite);
-                          setFadeGems(Math.min(bet.gems_wagered, member.gems));
                           setFadeKey((k) => k + 1);
                           betFormRef.current?.scrollIntoView({
                             behavior: "smooth",
@@ -480,7 +431,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                           });
                         }}
                         className="text-silver hover:text-accent ml-1 rounded px-1.5 py-0.5 text-xs transition-colors hover:bg-white/5"
-                        title={`Fade ${bet.member.display_name} — bet ${opposite} for ${Math.min(bet.gems_wagered, member.gems)} gems`}
+                        title={`Fade ${bet.member.display_name} — bet ${opposite}`}
                       >
                         Fade
                       </button>
@@ -493,7 +444,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
         </div>
       )}
 
-      {/* Score bets (visible after match finished or if user placed one) */}
+      {/* Score predictions (visible after match finished or if user placed one) */}
       {allScoreBets.length > 0 && (isFinished || userScoreBet) && (
         <div className="bg-card rounded-xl p-6">
           <h3 className="mb-3 text-lg font-bold">Score Predictions</h3>
@@ -508,10 +459,9 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
                   <span className="text-silver font-mono">
                     {bet.predicted_home}–{bet.predicted_away}
                   </span>
-                  <GemBadge gems={bet.gems_wagered} size="sm" />
                   {bet.resolved && (
-                    <span className={bet.gems_won > 0 ? "text-success" : "text-danger"}>
-                      {bet.gems_won > 0 ? `+${bet.gems_won}` : "Lost"}
+                    <span className={bet.points_won > 0 ? "text-success font-bold" : "text-danger"}>
+                      {bet.points_won > 0 ? `+${bet.points_won} pts` : "Miss"}
                     </span>
                   )}
                 </div>
