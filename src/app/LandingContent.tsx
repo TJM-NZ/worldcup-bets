@@ -26,7 +26,16 @@ function FootballIcon() {
   );
 }
 
-const COUNTRIES = ["🇧🇷", "🇩🇪", "🇦🇷", "🇫🇷", "🇪🇸", "🇵🇹", "🏴󠁧󠁢󠁥󠁮󠁧󠁿", "🇳🇿"];
+const COUNTRIES = [
+  { code: "br", name: "Brazil" },
+  { code: "de", name: "Germany" },
+  { code: "ar", name: "Argentina" },
+  { code: "fr", name: "France" },
+  { code: "es", name: "Spain" },
+  { code: "pt", name: "Portugal" },
+  { code: "gb-eng", name: "England" },
+  { code: "nz", name: "New Zealand" },
+];
 
 export default function LandingContent({ dashboardHref }: { dashboardHref: string | null }) {
   const isAuthenticated = dashboardHref !== null;
@@ -85,9 +94,17 @@ export default function LandingContent({ dashboardHref }: { dashboardHref: strin
             </p>
 
             {/* Country flags */}
-            <div className="flex justify-center gap-2 text-2xl opacity-60">
-              {COUNTRIES.map((flag, i) => (
-                <span key={i}>{flag}</span>
+            <div className="flex justify-center gap-2 opacity-60">
+              {COUNTRIES.map(({ code, name }) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={code}
+                  src={`https://flagcdn.com/w40/${code}.png`}
+                  alt={name}
+                  width={32}
+                  height={24}
+                  className="rounded-[2px]"
+                />
               ))}
             </div>
 
