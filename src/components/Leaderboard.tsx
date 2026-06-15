@@ -101,11 +101,10 @@ export default function Leaderboard({
       });
 
       entries.sort((a, b) => {
-        if (b.gamesWon !== a.gamesWon) return b.gamesWon - a.gamesWon;
+        if (b.points !== a.points) return b.points - a.points;
         const aRate = a.gamesWon + a.gamesLost > 0 ? a.gamesWon / (a.gamesWon + a.gamesLost) : -1;
         const bRate = b.gamesWon + b.gamesLost > 0 ? b.gamesWon / (b.gamesWon + b.gamesLost) : -1;
-        if (bRate !== aRate) return bRate - aRate;
-        return b.points - a.points;
+        return bRate - aRate;
       });
 
       setMembers(entries);
