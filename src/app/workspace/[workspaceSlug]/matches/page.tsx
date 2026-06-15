@@ -7,7 +7,7 @@ import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import NextUpStrip from "@/components/NextUpStrip";
 import GroupStandings from "@/components/GroupStandings";
-import { isInferredLive } from "@/lib/betting";
+import { isInferredFinished, isInferredLive } from "@/lib/betting";
 
 type Filter = "all" | "upcoming" | "live" | "finished" | "standings";
 
@@ -73,10 +73,13 @@ export default function MatchesPage() {
         );
       case "live":
         return (
-          m.status === "IN_PLAY" || m.status === "PAUSED" || isInferredLive(m.status, m.utc_date)
+          (m.status === "IN_PLAY" ||
+            m.status === "PAUSED" ||
+            isInferredLive(m.status, m.utc_date)) &&
+          !isInferredFinished(m.status, m.utc_date, m.stage)
         );
       case "finished":
-        return m.status === "FINISHED";
+        return m.status === "FINISHED" || isInferredFinished(m.status, m.utc_date, m.stage);
       default:
         return true;
     }
