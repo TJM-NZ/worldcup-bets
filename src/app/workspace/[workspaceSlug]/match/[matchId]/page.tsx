@@ -314,7 +314,16 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
       )}
 
       {/* Exact score betting */}
-      {isOpen && !userScoreBet && (
+      {isOpen && !userScoreBet && !userBet && (
+        <div className="bg-card rounded-xl p-6">
+          <h3 className="mb-1 text-lg font-bold">Predict Exact Score</h3>
+          <p className="text-silver text-sm">
+            Place your winner prediction first to unlock score betting.
+          </p>
+        </div>
+      )}
+
+      {isOpen && !userScoreBet && userBet && (
         <div className="bg-card rounded-xl p-6">
           <h3 className="mb-1 text-lg font-bold">Predict Exact Score</h3>
           <p className="text-silver mb-4 text-sm">
@@ -326,6 +335,7 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
             awayTeam={awayTeam}
             memberId={member.id}
             onBetPlaced={() => window.location.reload()}
+            prediction={userBet.prediction}
           />
         </div>
       )}
