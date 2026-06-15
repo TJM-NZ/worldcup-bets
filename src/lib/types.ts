@@ -12,6 +12,7 @@ export interface Member {
   workspace_id: string;
   user_id: string;
   display_name: string;
+  email?: string;
   points: number;
   role: "admin" | "member";
   created_at: string;

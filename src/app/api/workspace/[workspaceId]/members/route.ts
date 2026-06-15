@@ -31,7 +31,7 @@ export async function GET(
 
   const { data, error } = await supabase
     .from("members")
-    .select("id, display_name, points, role, created_at")
+    .select("id, user_id, display_name, points, role, created_at")
     .eq("workspace_id", workspaceId)
     .order("points", { ascending: false });
 
@@ -39,7 +39,12 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ members: data });
+  const { data: usersData } = await supabase.auth.admin.listUsers({ perPage: 1000 });
+  const emailMap = new Map(usersData?.users.map((u) => [u.id, u.email]) ?? []);
+
+  const members = data.map((m) => ({ ...m, email: emailMap.get(m.user_id) ?? null }));
+
+  return NextResponse.json({ members });
 }
 
 export async function PATCH(
