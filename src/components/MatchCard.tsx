@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Match, Team } from "@/lib/types";
 import CountdownTimer from "./CountdownTimer";
-import { isBettingOpen, isInferredFinished, isInferredLive } from "@/lib/betting";
+import { isBettingOpen, isInferredLive } from "@/lib/betting";
 
 interface MatchCardProps {
   match: Match;
@@ -66,12 +66,10 @@ export default function MatchCard({
   userBet,
 }: MatchCardProps) {
   const isLive =
-    (match.status === "IN_PLAY" ||
-      match.status === "PAUSED" ||
-      isInferredLive(match.status, match.utc_date)) &&
-    !isInferredFinished(match.status, match.utc_date, match.stage);
-  const isFinished =
-    match.status === "FINISHED" || isInferredFinished(match.status, match.utc_date, match.stage);
+    match.status === "IN_PLAY" ||
+    match.status === "PAUSED" ||
+    isInferredLive(match.status, match.utc_date);
+  const isFinished = match.status === "FINISHED";
   const isOpen = isBettingOpen(match.status) && new Date(match.utc_date) > new Date();
 
   const homeWinner = match.winner === "HOME_TEAM";
