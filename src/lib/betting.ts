@@ -45,3 +45,12 @@ export function isInferredLive(status: string, utcDate: string): boolean {
   const now = Date.now();
   return kickoff <= now && now - kickoff <= 120 * 60 * 1000;
 }
+
+/** True when the API is stuck on IN_PLAY/PAUSED but the match must have ended (free tier lag). */
+export function isInferredFinished(status: string, utcDate: string, stage: string): boolean {
+  if (status !== "IN_PLAY" && status !== "PAUSED") return false;
+  const kickoff = new Date(utcDate).getTime();
+  // Group stage: no extra time, ~110 min max. Knockout: extra time + penalties, ~160 min max.
+  const maxMinutes = stage === "GROUP_STAGE" ? 110 : 160;
+  return Date.now() - kickoff > maxMinutes * 60 * 1000;
+}
