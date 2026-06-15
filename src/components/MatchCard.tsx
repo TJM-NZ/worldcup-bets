@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Match, Team } from "@/lib/types";
 import CountdownTimer from "./CountdownTimer";
-import { isBettingOpen } from "@/lib/betting";
+import { isBettingOpen, isInferredLive } from "@/lib/betting";
 
 interface MatchCardProps {
   match: Match;
@@ -58,13 +58,6 @@ function statusLabel(status: string): string {
   }
 }
 
-function isMatchInferredLive(match: Match): boolean {
-  if (match.status !== "TIMED" && match.status !== "SCHEDULED") return false;
-  const kickoff = new Date(match.utc_date).getTime();
-  const now = Date.now();
-  return kickoff <= now && now - kickoff <= 120 * 60 * 1000;
-}
-
 export default function MatchCard({
   match,
   homeTeam,
@@ -73,7 +66,9 @@ export default function MatchCard({
   userBet,
 }: MatchCardProps) {
   const isLive =
-    match.status === "IN_PLAY" || match.status === "PAUSED" || isMatchInferredLive(match);
+    match.status === "IN_PLAY" ||
+    match.status === "PAUSED" ||
+    isInferredLive(match.status, match.utc_date);
   const isFinished = match.status === "FINISHED";
   const isOpen = isBettingOpen(match.status) && new Date(match.utc_date) > new Date();
 

@@ -147,6 +147,7 @@ export default function ManagePage() {
                         <span className="text-silver text-xs">(you)</span>
                       )}
                     </div>
+                    {m.email && <div className="text-silver mt-0.5 text-xs">{m.email}</div>}
                     <div className="mt-0.5 text-xs">
                       <span
                         className={`inline-block rounded-full px-2 py-0.5 font-medium ${

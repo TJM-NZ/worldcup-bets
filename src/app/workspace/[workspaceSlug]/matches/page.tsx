@@ -7,6 +7,7 @@ import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import NextUpStrip from "@/components/NextUpStrip";
 import GroupStandings from "@/components/GroupStandings";
+import { isInferredLive } from "@/lib/betting";
 
 type Filter = "all" | "upcoming" | "live" | "finished" | "standings";
 
@@ -66,9 +67,14 @@ export default function MatchesPage() {
   const filtered = matches.filter((m) => {
     switch (filter) {
       case "upcoming":
-        return m.status === "TIMED" || m.status === "SCHEDULED";
+        return (
+          (m.status === "TIMED" || m.status === "SCHEDULED") &&
+          !isInferredLive(m.status, m.utc_date)
+        );
       case "live":
-        return m.status === "IN_PLAY" || m.status === "PAUSED";
+        return (
+          m.status === "IN_PLAY" || m.status === "PAUSED" || isInferredLive(m.status, m.utc_date)
+        );
       case "finished":
         return m.status === "FINISHED";
       default:

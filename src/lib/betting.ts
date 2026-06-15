@@ -37,3 +37,11 @@ export function isBettingOpen(status: string): boolean {
 export function isDrawAvailable(stage: string): boolean {
   return stage === "GROUP_STAGE";
 }
+
+/** True for matches that have kicked off but the API hasn't flipped to IN_PLAY yet (free tier lag). */
+export function isInferredLive(status: string, utcDate: string): boolean {
+  if (status !== "TIMED" && status !== "SCHEDULED") return false;
+  const kickoff = new Date(utcDate).getTime();
+  const now = Date.now();
+  return kickoff <= now && now - kickoff <= 120 * 60 * 1000;
+}
