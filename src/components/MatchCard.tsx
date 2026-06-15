@@ -58,6 +58,13 @@ function statusLabel(status: string): string {
   }
 }
 
+function isMatchInferredLive(match: Match): boolean {
+  if (match.status !== "TIMED" && match.status !== "SCHEDULED") return false;
+  const kickoff = new Date(match.utc_date).getTime();
+  const now = Date.now();
+  return kickoff <= now && now - kickoff <= 120 * 60 * 1000;
+}
+
 export default function MatchCard({
   match,
   homeTeam,
@@ -65,7 +72,8 @@ export default function MatchCard({
   workspaceSlug,
   userBet,
 }: MatchCardProps) {
-  const isLive = match.status === "IN_PLAY" || match.status === "PAUSED";
+  const isLive =
+    match.status === "IN_PLAY" || match.status === "PAUSED" || isMatchInferredLive(match);
   const isFinished = match.status === "FINISHED";
   const isOpen = isBettingOpen(match.status) && new Date(match.utc_date) > new Date();
 
@@ -81,7 +89,13 @@ export default function MatchCard({
     >
       <div className="text-silver mb-2 flex items-center justify-between text-xs">
         <span>{(match.group_name || match.stage).replace(/_/g, " ")}</span>
-        {isLive && <span className="text-danger font-bold">{statusLabel(match.status)}</span>}
+        {isLive && (
+          <span className="text-danger font-bold">
+            {match.status === "IN_PLAY" || match.status === "PAUSED"
+              ? statusLabel(match.status)
+              : "LIVE"}
+          </span>
+        )}
         {isFinished && <span className="text-silver">{statusLabel(match.status)}</span>}
         {isOpen && <CountdownTimer targetDate={match.utc_date} />}
       </div>

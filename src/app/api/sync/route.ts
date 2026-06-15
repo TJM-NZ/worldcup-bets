@@ -2,17 +2,11 @@ import { NextResponse } from "next/server";
 import { syncTeams, syncMatches, syncStandings, shouldSync, logSync } from "@/lib/sync";
 
 export async function GET(request: Request) {
-  // Verify cron secret (Vercel injects this for cron jobs)
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { searchParams } = new URL(request.url);
+  const force = searchParams.get("force") === "true";
 
   try {
-    // Check adaptive polling schedule
-    const shouldRun = await shouldSync();
+    const shouldRun = force || (await shouldSync());
     if (!shouldRun) {
       return NextResponse.json({ status: "skipped", reason: "Not due yet" });
     }

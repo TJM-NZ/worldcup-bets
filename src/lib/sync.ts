@@ -286,9 +286,15 @@ export async function shouldSync(): Promise<boolean> {
     return hour === 6 && secondsSinceSync > 3600;
   }
 
-  // Check if any matches are live
+  // Check if any matches are live (including inferred: TIMED but kicked off within 2h)
   const liveStatuses = ["IN_PLAY", "PAUSED", "SUSPENDED"];
-  const hasLive = todayMatches.some((m) => liveStatuses.includes(m.status));
+  const hasLive = todayMatches.some(
+    (m) =>
+      liveStatuses.includes(m.status) ||
+      ((m.status === "TIMED" || m.status === "SCHEDULED") &&
+        new Date(m.utc_date).getTime() <= now.getTime() &&
+        now.getTime() - new Date(m.utc_date).getTime() <= 120 * 60 * 1000)
+  );
 
   if (hasLive) {
     return secondsSinceSync >= 55;
