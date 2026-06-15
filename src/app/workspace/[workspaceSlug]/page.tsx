@@ -6,6 +6,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Team, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import PointsBadge from "@/components/PointsBadge";
+import { isInferredLive } from "@/lib/betting";
 
 export default function WorkspaceDashboard() {
   const { workspace, member } = useWorkspace();
@@ -86,8 +87,13 @@ export default function WorkspaceDashboard() {
     }
   }
 
-  const liveMatches = matches.filter((m) => m.status === "IN_PLAY" || m.status === "PAUSED");
-  const upcoming = matches.filter((m) => m.status === "TIMED" || m.status === "SCHEDULED");
+  const liveMatches = matches.filter(
+    (m) => m.status === "IN_PLAY" || m.status === "PAUSED" || isInferredLive(m.status, m.utc_date)
+  );
+  const upcoming = matches.filter(
+    (m) =>
+      (m.status === "TIMED" || m.status === "SCHEDULED") && !isInferredLive(m.status, m.utc_date)
+  );
 
   return (
     <div className="space-y-8">
