@@ -23,22 +23,46 @@ interface StandingRow {
   goal_difference: number;
 }
 
+interface MatchResult {
+  homeName: string;
+  awayName: string;
+  homeScore: number;
+  awayScore: number;
+  stage: string;
+}
+
+const STAGE_LABELS: Record<string, string> = {
+  GROUP_STAGE: "Group Stage",
+  ROUND_OF_16: "Round of 16",
+  QUARTER_FINALS: "Quarter-finals",
+  SEMI_FINALS: "Semi-finals",
+  FINAL: "Final",
+  THIRD_PLACE: "Third Place Play-off",
+};
+
 function stageLabel(stage: string): string {
-  const labels: Record<string, string> = {
-    GROUP_STAGE: "Group Stage",
-    ROUND_OF_16: "Round of 16",
-    QUARTER_FINALS: "Quarter-finals",
-    SEMI_FINALS: "Semi-finals",
-    FINAL: "Final",
-    THIRD_PLACE: "Third Place Play-off",
-  };
-  return labels[stage] ?? stage;
+  return STAGE_LABELS[stage] ?? stage;
+}
+
+function historyBlock(teamName: string, results: MatchResult[]): string {
+  if (results.length === 0) return "";
+  const lines = results.map((r) => {
+    const scored = r.homeName === teamName ? r.homeScore : r.awayScore;
+    const conceded = r.homeName === teamName ? r.awayScore : r.homeScore;
+    const opponent = r.homeName === teamName ? r.awayName : r.homeName;
+    const venue = r.homeName === teamName ? "vs" : "@";
+    const result = scored > conceded ? "W" : scored < conceded ? "L" : "D";
+    return `  ${result} ${teamName} ${scored}-${conceded} ${opponent} (${venue}, ${stageLabel(r.stage)})`;
+  });
+  return `\n${teamName} last ${results.length} match${results.length > 1 ? "es" : ""}:\n${lines.join("\n")}`;
 }
 
 function buildPrompt(
   homeName: string,
   awayName: string,
   stage: string,
+  homeHistory: MatchResult[],
+  awayHistory: MatchResult[],
   homeStanding?: StandingRow,
   awayStanding?: StandingRow
 ): string {
@@ -46,16 +70,13 @@ function buildPrompt(
 
   const standingsBlock =
     isGroupStage && homeStanding && awayStanding
-      ? `
-Current group standings:
-- ${homeName}: P${homeStanding.position} ${homeStanding.won}W ${homeStanding.drawn}D ${homeStanding.lost}L  GD${homeStanding.goal_difference > 0 ? "+" : ""}${homeStanding.goal_difference}  ${homeStanding.points}pts
-- ${awayName}: P${awayStanding.position} ${awayStanding.won}W ${awayStanding.drawn}D ${awayStanding.lost}L  GD${awayStanding.goal_difference > 0 ? "+" : ""}${awayStanding.goal_difference}  ${awayStanding.points}pts`
+      ? `\nGroup standings:\n- ${homeName}: ${homeStanding.won}W ${homeStanding.drawn}D ${homeStanding.lost}L  GD${homeStanding.goal_difference >= 0 ? "+" : ""}${homeStanding.goal_difference}  ${homeStanding.points}pts\n- ${awayName}: ${awayStanding.won}W ${awayStanding.drawn}D ${awayStanding.lost}L  GD${awayStanding.goal_difference >= 0 ? "+" : ""}${awayStanding.goal_difference}  ${awayStanding.points}pts`
       : "";
 
   return `You are a football analyst predicting a FIFA World Cup 2026 match.
 
 ${homeName} vs ${awayName}
-Stage: ${stageLabel(stage)}${standingsBlock}
+Stage: ${stageLabel(stage)}${standingsBlock}${historyBlock(homeName, homeHistory)}${historyBlock(awayName, awayHistory)}
 
 ${isGroupStage ? "A draw is a valid result." : "This is a knockout match — there must be a winner (no draw)."}
 
@@ -150,12 +171,14 @@ export async function generateAiPicks(): Promise<number> {
 
   if (!aiMembers || aiMembers.length === 0) return 0;
 
-  // Upcoming bettable matches
+  // Next 5 upcoming bettable matches only
   const { data: matches } = await supabase
     .from("matches")
     .select("id, stage, group_name, home_team_id, away_team_id")
     .in("status", ["TIMED", "SCHEDULED"])
-    .gt("utc_date", new Date().toISOString());
+    .gt("utc_date", new Date().toISOString())
+    .order("utc_date", { ascending: true })
+    .limit(5);
 
   if (!matches || matches.length === 0) return 0;
 
@@ -175,6 +198,37 @@ export async function generateAiPicks(): Promise<number> {
       "team_id, position, points, won, drawn, lost, goals_for, goals_against, goal_difference"
     );
   const standingsMap = new Map(standingsRows?.map((s) => [s.team_id, s]) ?? []);
+
+  // Recent match history for each team (last 5 finished matches per team)
+  const { data: finishedMatches } = await supabase
+    .from("matches")
+    .select("home_team_id, away_team_id, home_score, away_score, stage")
+    .eq("status", "FINISHED")
+    .or(teamIds.map((id) => `home_team_id.eq.${id},away_team_id.eq.${id}`).join(","))
+    .order("utc_date", { ascending: false })
+    .limit(50);
+
+  // Build per-team history (up to 5 most recent)
+  const historyMap = new Map<number, MatchResult[]>();
+  for (const m of finishedMatches ?? []) {
+    const homeN = teamMap.get(m.home_team_id) ?? String(m.home_team_id);
+    const awayN = teamMap.get(m.away_team_id) ?? String(m.away_team_id);
+    const result: MatchResult = {
+      homeName: homeN,
+      awayName: awayN,
+      homeScore: m.home_score,
+      awayScore: m.away_score,
+      stage: m.stage,
+    };
+    for (const tid of [m.home_team_id, m.away_team_id]) {
+      if (!teamIds.includes(tid)) continue;
+      const arr = historyMap.get(tid) ?? [];
+      if (arr.length < 5) {
+        arr.push(result);
+        historyMap.set(tid, arr);
+      }
+    }
+  }
 
   // Run all models in parallel — each processes its own pending matches sequentially
   const results = await Promise.allSettled(
@@ -199,10 +253,22 @@ export async function generateAiPicks(): Promise<number> {
 
         const homeStanding = standingsMap.get(match.home_team_id) as StandingRow | undefined;
         const awayStanding = standingsMap.get(match.away_team_id) as StandingRow | undefined;
+        const homeHistory = historyMap.get(match.home_team_id) ?? [];
+        const awayHistory = historyMap.get(match.away_team_id) ?? [];
 
         let pick: AiPick | null = null;
         try {
-          pick = await caller(buildPrompt(home, away, match.stage, homeStanding, awayStanding));
+          pick = await caller(
+            buildPrompt(
+              home,
+              away,
+              match.stage,
+              homeHistory,
+              awayHistory,
+              homeStanding,
+              awayStanding
+            )
+          );
         } catch (e) {
           console.error(`[ai-picks] ${model} failed on match ${match.id}:`, e);
           continue;
@@ -213,18 +279,16 @@ export async function generateAiPicks(): Promise<number> {
           pick.result = pick.home_score >= pick.away_score ? "HOME" : "AWAY";
         }
 
-        await supabase
-          .from("bets")
-          .upsert(
-            {
-              member_id: member.id,
-              match_id: match.id,
-              prediction: pick.result,
-              points_won: 0,
-              resolved: false,
-            },
-            { onConflict: "member_id,match_id" }
-          );
+        await supabase.from("bets").upsert(
+          {
+            member_id: member.id,
+            match_id: match.id,
+            prediction: pick.result,
+            points_won: 0,
+            resolved: false,
+          },
+          { onConflict: "member_id,match_id" }
+        );
 
         await supabase.from("exact_score_bets").upsert(
           {
