@@ -10,15 +10,23 @@ import PointsBadge from "@/components/PointsBadge";
 const AI_MODELS = ["claude", "grok", "gemini", "deepseek"] as const;
 type AiModelKey = (typeof AI_MODELS)[number];
 
+interface AiPrediction {
+  prediction: string;
+  points_won: number;
+  resolved: boolean;
+  predicted_home: number | null;
+  predicted_away: number | null;
+  score_points_won: number;
+  score_resolved: boolean;
+}
+
 interface AiBet {
   match_id: number;
   home: string;
   away: string;
   utc_date: string;
   status: string;
-  predictions: Partial<
-    Record<AiModelKey, { prediction: string; points_won: number; resolved: boolean }>
-  >;
+  predictions: Partial<Record<AiModelKey, AiPrediction>>;
 }
 
 export default function ManagePage() {
@@ -91,6 +99,14 @@ export default function ManagePage() {
 
       const matchMap = new Map((matches ?? []).map((m) => [m.id, m]));
 
+      const { data: scoreBets } = await supabase
+        .from("exact_score_bets")
+        .select("member_id, match_id, predicted_home, predicted_away, points_won, resolved")
+        .in("member_id", memberIds)
+        .in("match_id", matchIds);
+
+      const scoreByKey = new Map((scoreBets ?? []).map((s) => [`${s.member_id}:${s.match_id}`, s]));
+
       const grouped = new Map<number, AiBet>();
       for (const bet of bets ?? []) {
         const match = matchMap.get(bet.match_id);
@@ -106,12 +122,18 @@ export default function ManagePage() {
           });
         }
         const model = modelById.get(bet.member_id);
-        if (model)
+        if (model) {
+          const score = scoreByKey.get(`${bet.member_id}:${bet.match_id}`);
           grouped.get(bet.match_id)!.predictions[model] = {
             prediction: bet.prediction,
             points_won: bet.points_won,
             resolved: bet.resolved,
+            predicted_home: score?.predicted_home ?? null,
+            predicted_away: score?.predicted_away ?? null,
+            score_points_won: score?.points_won ?? 0,
+            score_resolved: score?.resolved ?? false,
           };
+        }
       }
 
       setAiBets([...grouped.values()].sort((a, b) => b.utc_date.localeCompare(a.utc_date)));
@@ -351,23 +373,38 @@ export default function ManagePage() {
                       return (
                         <td key={model} className="px-3 py-3 text-center">
                           {p ? (
-                            <span
-                              className={
-                                !p.resolved
-                                  ? "text-silver"
-                                  : p.points_won > 0
-                                    ? "text-emerald-400"
-                                    : "text-red-400"
-                              }
-                            >
-                              {p.prediction === "HOME"
-                                ? row.home.split(" ").at(-1)
-                                : p.prediction === "AWAY"
-                                  ? row.away.split(" ").at(-1)
-                                  : "Draw"}
-                              {p.resolved && p.points_won > 0 && " ✓"}
-                              {p.resolved && p.points_won === 0 && " ✗"}
-                            </span>
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span
+                                className={
+                                  !p.resolved
+                                    ? "text-silver"
+                                    : p.points_won > 0
+                                      ? "text-emerald-400"
+                                      : "text-red-400"
+                                }
+                              >
+                                {p.prediction === "HOME"
+                                  ? row.home.split(" ").at(-1)
+                                  : p.prediction === "AWAY"
+                                    ? row.away.split(" ").at(-1)
+                                    : "Draw"}
+                                {p.resolved && p.points_won > 0 && " ✓"}
+                                {p.resolved && p.points_won === 0 && " ✗"}
+                              </span>
+                              {p.predicted_home !== null && p.predicted_away !== null && (
+                                <span
+                                  className={`text-xs ${
+                                    !p.score_resolved
+                                      ? "text-silver/60"
+                                      : p.score_points_won > 0
+                                        ? "text-emerald-400/80"
+                                        : "text-silver/60"
+                                  }`}
+                                >
+                                  {p.predicted_home}–{p.predicted_away}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-silver">—</span>
                           )}
