@@ -130,9 +130,9 @@ async function callGemini(prompt: string): Promise<AiPick | null> {
   if (!process.env.GOOGLE_AI_API_KEY) return null;
   const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
   const res = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     contents: prompt,
-    config: { responseMimeType: "application/json", maxOutputTokens: 128 },
+    config: { responseMimeType: "application/json", maxOutputTokens: 512 },
   });
   return parseJson(res.text ?? "");
 }
