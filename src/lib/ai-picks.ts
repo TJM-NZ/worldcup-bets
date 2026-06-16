@@ -159,15 +159,17 @@ const callers: Record<AiModel, (prompt: string) => Promise<AiPick | null>> = {
   deepseek: callDeepSeek,
 };
 
-export async function generateAiPicks(): Promise<number> {
+export async function generateAiPicks(model?: string): Promise<number> {
   const supabase = createServiceClient();
 
   // Load AI member rows
-  const { data: aiMembers } = await supabase
+  let query = supabase
     .from("members")
     .select("id, ai_model")
     .eq("is_ai", true)
     .eq("is_global", true);
+  if (model) query = query.eq("ai_model", model);
+  const { data: aiMembers } = await query;
 
   if (!aiMembers || aiMembers.length === 0) return 0;
 

@@ -2,9 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Member } from "@/lib/types";
 import PointsBadge from "@/components/PointsBadge";
+
+const AI_MODELS = ["claude", "grok", "gemini", "deepseek"] as const;
+type AiModelKey = (typeof AI_MODELS)[number];
+
+interface AiBet {
+  match_id: number;
+  home: string;
+  away: string;
+  utc_date: string;
+  status: string;
+  predictions: Partial<
+    Record<AiModelKey, { prediction: string; points_won: number; resolved: boolean }>
+  >;
+}
 
 export default function ManagePage() {
   const router = useRouter();
@@ -14,6 +29,9 @@ export default function ManagePage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [aiBets, setAiBets] = useState<AiBet[]>([]);
+  const [aiBetsLoading, setAiBetsLoading] = useState(true);
+  const [runningModel, setRunningModel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isAdmin) router.replace(`/workspace/${workspace.slug}`);
@@ -28,6 +46,96 @@ export default function ManagePage() {
         setLoading(false);
       });
   }, [workspace.id, isAdmin]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const supabase = createClient();
+
+    async function loadAiBets() {
+      const { data: aiMembers } = await supabase
+        .from("members")
+        .select("id, ai_model")
+        .eq("is_ai", true)
+        .eq("is_global", true);
+
+      if (!aiMembers?.length) {
+        setAiBetsLoading(false);
+        return;
+      }
+
+      const memberIds = aiMembers.map((m) => m.id);
+      const modelById = new Map(aiMembers.map((m) => [m.id, m.ai_model as AiModelKey]));
+
+      const { data: bets } = await supabase
+        .from("bets")
+        .select("member_id, match_id, prediction, points_won, resolved")
+        .in("member_id", memberIds);
+
+      const matchIds = [...new Set((bets ?? []).map((b) => b.match_id))];
+      if (!matchIds.length) {
+        setAiBetsLoading(false);
+        return;
+      }
+
+      const { data: matches } = await supabase
+        .from("matches")
+        .select("id, utc_date, status, home_team_id, away_team_id")
+        .in("id", matchIds)
+        .order("utc_date", { ascending: false });
+
+      const teamIds = [
+        ...new Set((matches ?? []).flatMap((m) => [m.home_team_id, m.away_team_id])),
+      ];
+      const { data: teams } = await supabase.from("teams").select("id, name").in("id", teamIds);
+      const teamMap = new Map(teams?.map((t) => [t.id, t.name]) ?? []);
+
+      const matchMap = new Map((matches ?? []).map((m) => [m.id, m]));
+
+      const grouped = new Map<number, AiBet>();
+      for (const bet of bets ?? []) {
+        const match = matchMap.get(bet.match_id);
+        if (!match) continue;
+        if (!grouped.has(bet.match_id)) {
+          grouped.set(bet.match_id, {
+            match_id: bet.match_id,
+            home: teamMap.get(match.home_team_id) ?? "?",
+            away: teamMap.get(match.away_team_id) ?? "?",
+            utc_date: match.utc_date,
+            status: match.status,
+            predictions: {},
+          });
+        }
+        const model = modelById.get(bet.member_id);
+        if (model)
+          grouped.get(bet.match_id)!.predictions[model] = {
+            prediction: bet.prediction,
+            points_won: bet.points_won,
+            resolved: bet.resolved,
+          };
+      }
+
+      setAiBets([...grouped.values()].sort((a, b) => b.utc_date.localeCompare(a.utc_date)));
+      setAiBetsLoading(false);
+    }
+
+    loadAiBets();
+  }, [isAdmin]);
+
+  async function runAiPicks(model: string) {
+    setRunningModel(model);
+    const res = await fetch("/api/ai-picks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model }),
+    });
+    const data = await res.json();
+    setRunningModel(null);
+    alert(`Done — ${data.picks ?? 0} new pick(s) generated for ${model}`);
+    setAiBetsLoading(true);
+    setAiBets([]);
+    // reload ai bets
+    window.location.reload();
+  }
 
   const inviteCode = workspace.invite_code;
   const inviteUrl =
@@ -183,6 +291,93 @@ export default function ManagePage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </section>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">AI Picks</h2>
+          <div className="flex gap-2">
+            {AI_MODELS.map((model) => (
+              <button
+                key={model}
+                onClick={() => runAiPicks(model)}
+                disabled={runningModel !== null}
+                className="border-card-hover text-silver hover:text-foreground hover:border-accent/50 rounded-lg border px-3 py-1.5 text-xs capitalize transition-colors disabled:opacity-40"
+              >
+                {runningModel === model ? "Running..." : `Run ${model}`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {aiBetsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="border-accent h-6 w-6 animate-spin rounded-full border-2 border-t-transparent" />
+          </div>
+        ) : aiBets.length === 0 ? (
+          <p className="text-silver py-4 text-sm">No AI picks yet.</p>
+        ) : (
+          <div className="bg-card overflow-x-auto rounded-xl">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-card-hover border-b">
+                  <th className="text-silver px-4 py-3 text-left font-medium">Match</th>
+                  <th className="text-silver px-3 py-3 text-left font-medium">Date</th>
+                  {AI_MODELS.map((m) => (
+                    <th
+                      key={m}
+                      className="text-silver px-3 py-3 text-center font-medium capitalize"
+                    >
+                      {m}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-card-hover divide-y">
+                {aiBets.map((row) => (
+                  <tr key={row.match_id}>
+                    <td className="px-4 py-3 font-medium">
+                      {row.home} vs {row.away}
+                    </td>
+                    <td className="text-silver px-3 py-3 whitespace-nowrap">
+                      {new Date(row.utc_date).toLocaleDateString("en-NZ", {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </td>
+                    {AI_MODELS.map((model) => {
+                      const p = row.predictions[model];
+                      return (
+                        <td key={model} className="px-3 py-3 text-center">
+                          {p ? (
+                            <span
+                              className={
+                                !p.resolved
+                                  ? "text-silver"
+                                  : p.points_won > 0
+                                    ? "text-emerald-400"
+                                    : "text-red-400"
+                              }
+                            >
+                              {p.prediction === "HOME"
+                                ? row.home.split(" ").at(-1)
+                                : p.prediction === "AWAY"
+                                  ? row.away.split(" ").at(-1)
+                                  : "Draw"}
+                              {p.resolved && p.points_won > 0 && " ✓"}
+                              {p.resolved && p.points_won === 0 && " ✗"}
+                            </span>
+                          ) : (
+                            <span className="text-silver">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
