@@ -6,10 +6,22 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { WinnerPick, Team } from "@/lib/types";
 import TeamPicker from "@/components/TeamPicker";
 
+const AI_MODELS = [
+  { key: "claude", label: "Claude", emoji: "🟠" },
+  { key: "grok", label: "Grok", emoji: "⚡" },
+  { key: "gemini", label: "Gemini", emoji: "💎" },
+  { key: "deepseek", label: "DeepSeek", emoji: "🌊" },
+] as const;
+
+type AiModelKey = (typeof AI_MODELS)[number]["key"];
+
 export default function WinnerPickPage() {
   const { member } = useWorkspace();
-  const [pick, setPick] = useState<(WinnerPick & { team?: Team }) | null>(null);
+  const [pick, setPick] = useState<(WinnerPick & { team?: Team; ai_model_pick?: string }) | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
+  const [savingAi, setSavingAi] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -18,19 +30,40 @@ export default function WinnerPickPage() {
       .from("winner_picks")
       .select("*")
       .eq("member_id", member.id)
-      .single()
+      .maybeSingle()
       .then(async ({ data }) => {
         if (data) {
-          const { data: team } = await supabase
-            .from("teams")
-            .select("*")
-            .eq("id", data.team_id)
-            .single();
-          setPick({ ...data, team: team || undefined });
+          if (data.team_id) {
+            const { data: team } = await supabase
+              .from("teams")
+              .select("*")
+              .eq("id", data.team_id)
+              .single();
+            setPick({ ...data, team: team || undefined });
+          } else {
+            setPick(data);
+          }
         }
         setLoading(false);
       });
   }, [member.id]);
+
+  async function pickAiModel(model: AiModelKey) {
+    setSavingAi(true);
+    const supabase = createClient();
+    await supabase
+      .from("winner_picks")
+      .upsert({ member_id: member.id, ai_model_pick: model }, { onConflict: "member_id" });
+    setPick((prev) =>
+      prev
+        ? { ...prev, ai_model_pick: model }
+        : ({ member_id: member.id, ai_model_pick: model } as WinnerPick & {
+            team?: Team;
+            ai_model_pick?: string;
+          })
+    );
+    setSavingAi(false);
+  }
 
   if (loading) {
     return (
@@ -40,38 +73,89 @@ export default function WinnerPickPage() {
     );
   }
 
-  return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Tournament Winner Pick</h1>
-        <p className="text-silver mt-1 text-sm">
-          Pick who you think will win the World Cup. Correct pick = +10 bonus points. Pick locks
-          when the first knockout match starts.
-        </p>
-      </div>
+  const aiPick = pick?.ai_model_pick;
+  const aiModel = AI_MODELS.find((m) => m.key === aiPick);
 
-      {pick ? (
-        <div className="bg-card rounded-xl p-6">
-          <h3 className="mb-3 font-bold">Your Pick</h3>
-          <div className="flex items-center gap-4">
-            {pick.team?.crest_url && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={pick.team.crest_url} alt="" className="h-12 w-12 object-contain" />
-            )}
-            <div>
-              <p className="text-xl font-bold">{pick.team?.name || "Unknown Team"}</p>
-              {pick.resolved && (
-                <p className={pick.points_won > 0 ? "text-success font-bold" : "text-danger"}>
-                  {pick.points_won > 0 ? `+${pick.points_won} pts` : "Not the winner"}
-                </p>
+  return (
+    <div className="mx-auto max-w-lg space-y-8">
+      {/* Team pick */}
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold">Tournament Winner Pick</h1>
+          <p className="text-silver mt-1 text-sm">
+            Pick who you think will win the World Cup. Correct pick = +10 bonus points. Pick locks
+            when the first knockout match starts.
+          </p>
+        </div>
+
+        {pick?.team_id ? (
+          <div className="bg-card rounded-xl p-6">
+            <h3 className="mb-3 font-bold">Your Pick</h3>
+            <div className="flex items-center gap-4">
+              {pick.team?.crest_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pick.team.crest_url} alt="" className="h-12 w-12 object-contain" />
               )}
-              {!pick.resolved && <p className="text-silver text-sm">Awaiting tournament result</p>}
+              <div>
+                <p className="text-xl font-bold">{pick.team?.name || "Unknown Team"}</p>
+                {pick.resolved && (
+                  <p className={pick.points_won > 0 ? "text-success font-bold" : "text-danger"}>
+                    {pick.points_won > 0 ? `+${pick.points_won} pts` : "Not the winner"}
+                  </p>
+                )}
+                {!pick.resolved && (
+                  <p className="text-silver text-sm">Awaiting tournament result</p>
+                )}
+              </div>
             </div>
           </div>
+        ) : (
+          <TeamPicker memberId={member.id} onPicked={() => window.location.reload()} />
+        )}
+      </div>
+
+      {/* AI leaderboard pick */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold">Which AI Will Win?</h2>
+          <p className="text-silver mt-1 text-sm">
+            Pick which AI model will top the AI leaderboard at the end of the tournament. Correct
+            pick = +5 bonus points.
+          </p>
         </div>
-      ) : (
-        <TeamPicker memberId={member.id} onPicked={() => window.location.reload()} />
-      )}
+
+        {aiModel ? (
+          <div className="bg-card rounded-xl p-6">
+            <h3 className="mb-3 font-bold">Your Pick</h3>
+            <div className="flex items-center gap-3 text-xl">
+              <span>{aiModel.emoji}</span>
+              <span className="font-bold">{aiModel.label}</span>
+            </div>
+            <button
+              onClick={() =>
+                setPick((prev) => (prev ? { ...prev, ai_model_pick: undefined } : null))
+              }
+              className="text-silver hover:text-foreground mt-3 text-xs underline"
+            >
+              Change pick
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {AI_MODELS.map((model) => (
+              <button
+                key={model.key}
+                onClick={() => pickAiModel(model.key)}
+                disabled={savingAi}
+                className="bg-card border-card-hover hover:border-accent flex items-center gap-3 rounded-xl border p-4 text-left transition-colors disabled:opacity-50"
+              >
+                <span className="text-2xl">{model.emoji}</span>
+                <span className="font-semibold">{model.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
