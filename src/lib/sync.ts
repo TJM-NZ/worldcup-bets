@@ -1,6 +1,7 @@
 import { createServiceClient } from "./supabase/server";
 import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
 import { winnerToPrediction, RESULT_POINTS, EXACT_SCORE_POINTS } from "./betting";
+import { resolveAiPicks } from "./ai-picks";
 import { FdMatch } from "./types";
 
 /** Seed teams from football-data.org */
@@ -206,6 +207,8 @@ async function resolveMatch(
   if (notifRows.length > 0) {
     await supabase.from("notifications").insert(notifRows);
   }
+
+  await resolveAiPicks(matchId, winner, homeScore, awayScore);
 
   return totalResolved;
 }

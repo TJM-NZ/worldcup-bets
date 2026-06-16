@@ -10,7 +10,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "seed:ai": "npx tsx scripts/seed-ai-players.ts"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -22,9 +23,12 @@
     ]
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.2",
+    "@google/genai": "^2.8.0",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
     "next": "16.2.9",
+    "openai": "^6.42.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"
   },
