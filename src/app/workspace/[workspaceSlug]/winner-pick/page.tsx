@@ -131,14 +131,6 @@ export default function WinnerPickPage() {
               <span>{aiModel.emoji}</span>
               <span className="font-bold">{aiModel.label}</span>
             </div>
-            <button
-              onClick={() =>
-                setPick((prev) => (prev ? { ...prev, ai_model_pick: undefined } : null))
-              }
-              className="text-silver hover:text-foreground mt-3 text-xs underline"
-            >
-              Change pick
-            </button>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
