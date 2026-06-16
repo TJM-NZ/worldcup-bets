@@ -1,7 +1,7 @@
 import { createServiceClient } from "./supabase/server";
 import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
 import { winnerToPrediction, RESULT_POINTS, EXACT_SCORE_POINTS } from "./betting";
-import { generateAiPicks, resolveAiPicks } from "./ai-picks";
+import { resolveAiPicks } from "./ai-picks";
 import { FdMatch } from "./types";
 
 /** Seed teams from football-data.org */
@@ -102,9 +102,6 @@ export async function syncMatches(): Promise<{
   for (const match of newlyCancelled) {
     betsResolved += await cancelMatch(match.id);
   }
-
-  // Generate AI picks for any upcoming matches not yet bet on
-  generateAiPicks().catch((e) => console.error("[sync] generateAiPicks failed:", e));
 
   return { matchesUpdated: rows.length, betsResolved };
 }

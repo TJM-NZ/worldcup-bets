@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { syncTeams, syncMatches, syncStandings, shouldSync, logSync } from "@/lib/sync";
+import { generateAiPicks } from "@/lib/ai-picks";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -20,6 +21,9 @@ export async function GET(request: Request) {
     // Sync standings (daily-gated — no-op if updated recently)
     const standingsCount = await syncStandings();
 
+    // Generate AI picks for any upcoming matches not yet covered
+    const aiPicks = await generateAiPicks();
+
     await logSync(matchesUpdated);
 
     return NextResponse.json({
@@ -28,6 +32,7 @@ export async function GET(request: Request) {
       matchesUpdated,
       betsResolved,
       standingsUpdated: standingsCount,
+      aiPicks,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown sync error";
