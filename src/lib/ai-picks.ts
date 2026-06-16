@@ -176,75 +176,76 @@ export async function generateAiPicks(): Promise<number> {
     );
   const standingsMap = new Map(standingsRows?.map((s) => [s.team_id, s]) ?? []);
 
-  let total = 0;
+  // Run all models in parallel — each processes its own pending matches sequentially
+  const results = await Promise.allSettled(
+    aiMembers.map(async (member) => {
+      const model = member.ai_model as AiModel;
+      const caller = callers[model];
+      if (!caller) return 0;
 
-  for (const member of aiMembers) {
-    const model = member.ai_model as AiModel;
-    const caller = callers[model];
-    if (!caller) continue;
-
-    // Which matches has this AI already bet on?
-    const { data: existing } = await supabase
-      .from("bets")
-      .select("match_id")
-      .eq("member_id", member.id);
-    const done = new Set(existing?.map((b) => b.match_id) ?? []);
-
-    const pending = matches.filter((m) => !done.has(m.id));
-    if (pending.length === 0) continue;
-
-    for (const match of pending) {
-      const home = teamMap.get(match.home_team_id);
-      const away = teamMap.get(match.away_team_id);
-      if (!home || !away) continue;
-
-      const homeStanding = standingsMap.get(match.home_team_id) as StandingRow | undefined;
-      const awayStanding = standingsMap.get(match.away_team_id) as StandingRow | undefined;
-
-      let pick: AiPick | null = null;
-      try {
-        pick = await caller(buildPrompt(home, away, match.stage, homeStanding, awayStanding));
-      } catch (e) {
-        console.error(`[ai-picks] ${model} failed on match ${match.id}:`, e);
-        continue;
-      }
-      if (!pick) continue;
-
-      // No draws in knockout
-      if (pick.result === "DRAW" && match.stage !== "GROUP_STAGE") {
-        pick.result = pick.home_score >= pick.away_score ? "HOME" : "AWAY";
-      }
-
-      await supabase
+      const { data: existing } = await supabase
         .from("bets")
-        .upsert(
+        .select("match_id")
+        .eq("member_id", member.id);
+      const done = new Set(existing?.map((b) => b.match_id) ?? []);
+
+      const pending = matches.filter((m) => !done.has(m.id));
+      let count = 0;
+
+      for (const match of pending) {
+        const home = teamMap.get(match.home_team_id);
+        const away = teamMap.get(match.away_team_id);
+        if (!home || !away) continue;
+
+        const homeStanding = standingsMap.get(match.home_team_id) as StandingRow | undefined;
+        const awayStanding = standingsMap.get(match.away_team_id) as StandingRow | undefined;
+
+        let pick: AiPick | null = null;
+        try {
+          pick = await caller(buildPrompt(home, away, match.stage, homeStanding, awayStanding));
+        } catch (e) {
+          console.error(`[ai-picks] ${model} failed on match ${match.id}:`, e);
+          continue;
+        }
+        if (!pick) continue;
+
+        if (pick.result === "DRAW" && match.stage !== "GROUP_STAGE") {
+          pick.result = pick.home_score >= pick.away_score ? "HOME" : "AWAY";
+        }
+
+        await supabase
+          .from("bets")
+          .upsert(
+            {
+              member_id: member.id,
+              match_id: match.id,
+              prediction: pick.result,
+              points_won: 0,
+              resolved: false,
+            },
+            { onConflict: "member_id,match_id" }
+          );
+
+        await supabase.from("exact_score_bets").upsert(
           {
             member_id: member.id,
             match_id: match.id,
-            prediction: pick.result,
+            predicted_home: pick.home_score,
+            predicted_away: pick.away_score,
             points_won: 0,
             resolved: false,
           },
           { onConflict: "member_id,match_id" }
         );
 
-      await supabase.from("exact_score_bets").upsert(
-        {
-          member_id: member.id,
-          match_id: match.id,
-          predicted_home: pick.home_score,
-          predicted_away: pick.away_score,
-          points_won: 0,
-          resolved: false,
-        },
-        { onConflict: "member_id,match_id" }
-      );
+        count++;
+      }
 
-      total++;
-    }
-  }
+      return count;
+    })
+  );
 
-  return total;
+  return results.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
 }
 
 /** Score AI predictions for a newly finished match (called from resolveMatch) */
