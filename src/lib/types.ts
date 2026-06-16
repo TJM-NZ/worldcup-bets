@@ -15,6 +15,9 @@ export interface Member {
   email?: string;
   points: number;
   role: "admin" | "member";
+  is_ai: boolean;
+  ai_model: string | null;
+  is_global: boolean;
   created_at: string;
 }
 

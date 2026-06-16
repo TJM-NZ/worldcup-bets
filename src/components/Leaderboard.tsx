@@ -8,6 +8,8 @@ interface LeaderboardEntry {
   id: string;
   display_name: string;
   points: number;
+  is_ai: boolean;
+  ai_model: string | null;
   crestUrl?: string;
   teamName?: string;
   gamesWon: number;
@@ -36,8 +38,8 @@ export default function Leaderboard({
     async function load() {
       const { data: memberData } = await supabase
         .from("members")
-        .select("id, display_name, points, winner_picks(teams(crest_url, name))")
-        .eq("workspace_id", workspaceId);
+        .select("id, display_name, points, is_ai, ai_model, winner_picks(teams(crest_url, name))")
+        .or(`workspace_id.eq.${workspaceId},is_global.eq.true`);
 
       if (!memberData) return;
 
@@ -100,6 +102,16 @@ export default function Leaderboard({
         };
       });
 
+      // Ensure AI members without bets still show default stats
+      for (const entry of entries) {
+        if (!stats[entry.id]) {
+          entry.gamesWon = 0;
+          entry.gamesLost = 0;
+          entry.gamesPending = 0;
+          entry.exactScoreWins = 0;
+        }
+      }
+
       entries.sort((a, b) => {
         if (b.points !== a.points) return b.points - a.points;
         const aRate = a.gamesWon + a.gamesLost > 0 ? a.gamesWon / (a.gamesWon + a.gamesLost) : -1;
@@ -114,16 +126,7 @@ export default function Leaderboard({
 
     const channel = supabase
       .channel("leaderboard")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "members",
-          filter: `workspace_id=eq.${workspaceId}`,
-        },
-        () => load()
-      )
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "bets" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "exact_score_bets" }, () =>
         load()
@@ -157,18 +160,25 @@ export default function Leaderboard({
                 {i + 1}
               </span>
               <span className="flex min-w-0 flex-1 items-center gap-2 font-medium">
-                {member.crestUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={member.crestUrl}
-                    alt={member.teamName || ""}
-                    className="h-5 w-5 shrink-0 object-contain"
-                    title={member.teamName}
-                  />
+                {member.is_ai ? (
+                  <span className="shrink-0 text-base">🤖</span>
+                ) : (
+                  member.crestUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={member.crestUrl}
+                      alt={member.teamName || ""}
+                      className="h-5 w-5 shrink-0 object-contain"
+                      title={member.teamName}
+                    />
+                  )
                 )}
                 <span className="truncate">
                   {member.display_name}
-                  {member.id === currentMemberId && (
+                  {member.is_ai && (
+                    <span className="text-silver ml-1.5 text-xs font-normal">AI</span>
+                  )}
+                  {member.id === currentMemberId && !member.is_ai && (
                     <span className="text-silver ml-2 text-xs">(you)</span>
                   )}
                 </span>
