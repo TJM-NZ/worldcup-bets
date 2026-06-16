@@ -265,9 +265,12 @@ export default function ManagePage() {
         ) : (
           <div className="bg-card divide-card-hover divide-y rounded-xl">
             {members.map((m) => (
-              <div key={m.id} className="flex items-center justify-between px-5 py-4">
+              <div
+                key={m.id}
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="bg-accent/20 text-accent flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold">
+                  <div className="bg-accent/20 text-accent flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold">
                     {m.display_name[0].toUpperCase()}
                   </div>
                   <div>
@@ -292,14 +295,14 @@ export default function ManagePage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 pl-12 sm:pl-0">
                   <PointsBadge points={m.points} />
                   <button
                     onClick={() => toggleRole(m)}
                     disabled={updating === m.id || deleting === m.id || m.id === currentMember.id}
                     className="border-card-hover text-silver hover:text-foreground hover:border-accent/50 rounded-lg border px-3 py-1.5 text-sm transition-colors disabled:opacity-40"
                   >
-                    {updating === m.id ? "..." : m.role === "admin" ? "Remove admin" : "Make admin"}
+                    {updating === m.id ? "…" : m.role === "admin" ? "Demote" : "Promote"}
                   </button>
                   {m.id !== currentMember.id && (
                     <button
@@ -307,7 +310,7 @@ export default function ManagePage() {
                       disabled={deleting === m.id || updating === m.id}
                       className="rounded-lg border border-red-500/30 px-3 py-1.5 text-sm text-red-400 transition-colors hover:border-red-500/60 hover:text-red-300 disabled:opacity-40"
                     >
-                      {deleting === m.id ? "..." : "Remove"}
+                      {deleting === m.id ? "…" : "Remove"}
                     </button>
                   )}
                 </div>
@@ -317,9 +320,9 @@ export default function ManagePage() {
         )}
       </section>
       <section className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">AI Picks</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {AI_MODELS.map((model) => (
               <button
                 key={model}
@@ -327,7 +330,7 @@ export default function ManagePage() {
                 disabled={runningModel !== null}
                 className="border-card-hover text-silver hover:text-foreground hover:border-accent/50 rounded-lg border px-3 py-1.5 text-xs capitalize transition-colors disabled:opacity-40"
               >
-                {runningModel === model ? "Running..." : `Run ${model}`}
+                {runningModel === model ? "Running…" : `Run ${model}`}
               </button>
             ))}
           </div>
@@ -340,82 +343,146 @@ export default function ManagePage() {
         ) : aiBets.length === 0 ? (
           <p className="text-silver py-4 text-sm">No AI picks yet.</p>
         ) : (
-          <div className="bg-card overflow-x-auto rounded-xl">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-card-hover border-b">
-                  <th className="text-silver px-4 py-3 text-left font-medium">Match</th>
-                  <th className="text-silver px-3 py-3 text-left font-medium">Date</th>
-                  {AI_MODELS.map((m) => (
-                    <th
-                      key={m}
-                      className="text-silver px-3 py-3 text-center font-medium capitalize"
-                    >
-                      {m}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-card-hover divide-y">
-                {aiBets.map((row) => (
-                  <tr key={row.match_id}>
-                    <td className="px-4 py-3 font-medium">
+          <>
+            {/* Mobile: card list */}
+            <div className="bg-card divide-card-hover divide-y rounded-xl sm:hidden">
+              {aiBets.map((row) => (
+                <div key={row.match_id} className="px-4 py-3">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-medium">
                       {row.home} vs {row.away}
-                    </td>
-                    <td className="text-silver px-3 py-3 whitespace-nowrap">
+                    </span>
+                    <span className="text-silver shrink-0 text-xs">
                       {new Date(row.utc_date).toLocaleDateString("en-NZ", {
                         month: "short",
                         day: "numeric",
                       })}
-                    </td>
+                    </span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                     {AI_MODELS.map((model) => {
                       const p = row.predictions[model];
+                      if (!p) return null;
+                      const label =
+                        p.prediction === "HOME"
+                          ? row.home.split(" ").at(-1)
+                          : p.prediction === "AWAY"
+                            ? row.away.split(" ").at(-1)
+                            : "Draw";
                       return (
-                        <td key={model} className="px-3 py-3 text-center">
-                          {p ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span
-                                className={
-                                  !p.resolved
-                                    ? "text-silver"
-                                    : p.points_won > 0
-                                      ? "text-emerald-400"
-                                      : "text-red-400"
-                                }
-                              >
-                                {p.prediction === "HOME"
-                                  ? row.home.split(" ").at(-1)
-                                  : p.prediction === "AWAY"
-                                    ? row.away.split(" ").at(-1)
-                                    : "Draw"}
-                                {p.resolved && p.points_won > 0 && " ✓"}
-                                {p.resolved && p.points_won === 0 && " ✗"}
-                              </span>
-                              {p.predicted_home !== null && p.predicted_away !== null && (
-                                <span
-                                  className={`text-xs ${
-                                    !p.score_resolved
-                                      ? "text-silver/60"
-                                      : p.score_points_won > 0
-                                        ? "text-emerald-400/80"
-                                        : "text-silver/60"
-                                  }`}
-                                >
-                                  {p.predicted_home}–{p.predicted_away}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-silver">—</span>
+                        <div key={model} className="flex items-center gap-1 text-xs">
+                          <span className="text-silver capitalize">{model}:</span>
+                          <span
+                            className={
+                              !p.resolved
+                                ? "text-foreground"
+                                : p.points_won > 0
+                                  ? "text-emerald-400"
+                                  : "text-red-400"
+                            }
+                          >
+                            {label}
+                            {p.resolved && (p.points_won > 0 ? " ✓" : " ✗")}
+                          </span>
+                          {p.predicted_home !== null && p.predicted_away !== null && (
+                            <span
+                              className={`${
+                                !p.score_resolved
+                                  ? "text-silver/60"
+                                  : p.score_points_won > 0
+                                    ? "text-emerald-400/80"
+                                    : "text-silver/60"
+                              }`}
+                            >
+                              ({p.predicted_home}–{p.predicted_away})
+                            </span>
                           )}
-                        </td>
+                        </div>
                       );
                     })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop: table */}
+            <div className="bg-card hidden overflow-x-auto rounded-xl sm:block">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-card-hover border-b">
+                    <th className="text-silver px-4 py-3 text-left font-medium">Match</th>
+                    <th className="text-silver px-3 py-3 text-left font-medium">Date</th>
+                    {AI_MODELS.map((m) => (
+                      <th
+                        key={m}
+                        className="text-silver px-3 py-3 text-center font-medium capitalize"
+                      >
+                        {m}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-card-hover divide-y">
+                  {aiBets.map((row) => (
+                    <tr key={row.match_id}>
+                      <td className="px-4 py-3 font-medium">
+                        {row.home} vs {row.away}
+                      </td>
+                      <td className="text-silver px-3 py-3 whitespace-nowrap">
+                        {new Date(row.utc_date).toLocaleDateString("en-NZ", {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </td>
+                      {AI_MODELS.map((model) => {
+                        const p = row.predictions[model];
+                        return (
+                          <td key={model} className="px-3 py-3 text-center">
+                            {p ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span
+                                  className={
+                                    !p.resolved
+                                      ? "text-silver"
+                                      : p.points_won > 0
+                                        ? "text-emerald-400"
+                                        : "text-red-400"
+                                  }
+                                >
+                                  {p.prediction === "HOME"
+                                    ? row.home.split(" ").at(-1)
+                                    : p.prediction === "AWAY"
+                                      ? row.away.split(" ").at(-1)
+                                      : "Draw"}
+                                  {p.resolved && p.points_won > 0 && " ✓"}
+                                  {p.resolved && p.points_won === 0 && " ✗"}
+                                </span>
+                                {p.predicted_home !== null && p.predicted_away !== null && (
+                                  <span
+                                    className={`text-xs ${
+                                      !p.score_resolved
+                                        ? "text-silver/60"
+                                        : p.score_points_won > 0
+                                          ? "text-emerald-400/80"
+                                          : "text-silver/60"
+                                    }`}
+                                  >
+                                    {p.predicted_home}–{p.predicted_away}
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-silver">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
     </div>
