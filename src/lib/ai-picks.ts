@@ -132,9 +132,22 @@ async function callGemini(prompt: string): Promise<AiPick | null> {
   const res = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
-    config: { responseMimeType: "application/json", maxOutputTokens: 512 },
+    config: {
+      responseMimeType: "application/json",
+      maxOutputTokens: 512,
+      // 2.5-flash defaults to dynamic thinking, which can consume the entire
+      // maxOutputTokens budget on reasoning and leave none for the JSON output.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   });
-  return parseJson(res.text ?? "");
+  const pick = parseJson(res.text ?? "");
+  if (!pick) {
+    console.warn(
+      `[ai-picks] gemini returned unparsable response (finishReason: ${res.candidates?.[0]?.finishReason}):`,
+      res.text
+    );
+  }
+  return pick;
 }
 
 async function callDeepSeek(prompt: string): Promise<AiPick | null> {
