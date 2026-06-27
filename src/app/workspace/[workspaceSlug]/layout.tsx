@@ -11,22 +11,17 @@ export default async function WorkspaceLayout({
   params: Promise<{ workspaceSlug: string }>;
 }) {
   const { workspaceSlug } = await params;
-  const user = await requireAuth();
-
   const supabase = createServiceClient();
 
-  // Load workspace by slug
-  const { data: workspace } = await supabase
-    .from("workspaces")
-    .select("*")
-    .eq("slug", workspaceSlug)
-    .single();
+  const [user, { data: workspace }] = await Promise.all([
+    requireAuth(),
+    supabase.from("workspaces").select("*").eq("slug", workspaceSlug).single(),
+  ]);
 
   if (!workspace) {
     redirect("/setup");
   }
 
-  // Load member
   const { data: member } = await supabase
     .from("members")
     .select("*")
