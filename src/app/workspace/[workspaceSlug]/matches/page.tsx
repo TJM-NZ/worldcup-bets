@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Bet } from "@/lib/types";
@@ -15,6 +15,7 @@ export default function MatchesPage() {
   const [matches, setMatches] = useState<Match[]>([]);
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
   const [filter, setFilter] = useState<Filter>("all");
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -30,13 +31,19 @@ export default function MatchesPage() {
 
     load();
 
+    function scheduleReload() {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      reloadTimer.current = setTimeout(load, 500);
+    }
+
     const channel = supabase
       .channel("all-matches")
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, scheduleReload)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, []);
 

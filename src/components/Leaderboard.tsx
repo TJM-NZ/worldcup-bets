@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import PointsBadge from "./PointsBadge";
@@ -54,6 +54,7 @@ export default function Leaderboard({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [betsCache, setBetsCache] = useState<Record<string, BetDetail[]>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -147,17 +148,27 @@ export default function Leaderboard({
 
     load();
 
+    function scheduleReload() {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      reloadTimer.current = setTimeout(load, 500);
+    }
+
     const channel = supabase
       .channel("leaderboard")
-      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, () => load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "bets" }, () => load())
-      .on("postgres_changes", { event: "*", schema: "public", table: "exact_score_bets" }, () =>
-        load()
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, scheduleReload)
+      // UPDATE only: bet resolution changes points/won/lost; new bets (INSERT) only shift
+      // pending count which doesn't warrant a full leaderboard reload
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "bets" }, scheduleReload)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "exact_score_bets" },
+        scheduleReload
       )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, [workspaceId]);
 

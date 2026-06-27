@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Bet } from "@/lib/types";
@@ -14,6 +14,7 @@ export default function WorkspaceDashboard() {
   const [memberCount, setMemberCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,14 +40,19 @@ export default function WorkspaceDashboard() {
 
     load();
 
-    // Realtime match updates
+    function scheduleReload() {
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
+      reloadTimer.current = setTimeout(load, 500);
+    }
+
     const channel = supabase
       .channel("dashboard-matches")
-      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "matches" }, scheduleReload)
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
+      if (reloadTimer.current) clearTimeout(reloadTimer.current);
     };
   }, [workspace.id, refreshKey]);
 
