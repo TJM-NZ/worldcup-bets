@@ -2,18 +2,20 @@ import { redirect } from "next/navigation";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import type { User } from "@supabase/supabase-js";
 
-/** Server-side auth check. Redirects to /login if not authenticated. */
+/** Server-side auth check. Redirects to /login if not authenticated.
+ *  Uses getSession() (local JWT decode, no network) because middleware has
+ *  already validated the session via getUser() on this same request. */
 export async function requireAuth(): Promise<User> {
   const supabase = await createClient();
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
 
-  if (!user) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  return user;
+  return session.user;
 }
 
 /** Look up the user's first workspace slug using service client (bypasses RLS). */

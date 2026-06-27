@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import { Match, Team, Bet } from "@/lib/types";
+import { Match, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import PointsBadge from "@/components/PointsBadge";
 
 export default function WorkspaceDashboard() {
-  const { workspace, member } = useWorkspace();
+  const { workspace, member, teams } = useWorkspace();
   const [matches, setMatches] = useState<Match[]>([]);
-  const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
   const [memberCount, setMemberCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
@@ -36,14 +35,6 @@ export default function WorkspaceDashboard() {
         .limit(10);
 
       if (matchData) setMatches(matchData);
-
-      // Load teams
-      const { data: teamData } = await supabase.from("teams").select("*");
-      if (teamData) {
-        const map = new Map<number, Team>();
-        teamData.forEach((t) => map.set(t.id, t));
-        setTeams(map);
-      }
     }
 
     load();

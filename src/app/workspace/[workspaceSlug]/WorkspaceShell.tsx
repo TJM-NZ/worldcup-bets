@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { WorkspaceProvider } from "@/lib/workspace-context";
 import WorkspaceNav from "@/components/WorkspaceNav";
 import { TourProvider } from "@/components/Tour";
-import { Workspace, Member } from "@/lib/types";
+import { Workspace, Member, Team } from "@/lib/types";
 
 export default function WorkspaceShell({
   workspace,
@@ -17,8 +17,22 @@ export default function WorkspaceShell({
   children: React.ReactNode;
 }) {
   const [member, setMember] = useState(initialMember);
+  const [teams, setTeams] = useState<Map<number, Team>>(new Map());
 
-  // Realtime updates for member gems
+  useEffect(() => {
+    createClient()
+      .from("teams")
+      .select("*")
+      .then(({ data }) => {
+        if (data) {
+          const map = new Map<number, Team>();
+          data.forEach((t) => map.set(t.id, t));
+          setTeams(map);
+        }
+      });
+  }, []);
+
+  // Realtime updates for member points
   useEffect(() => {
     const supabase = createClient();
     const channel = supabase
@@ -45,7 +59,7 @@ export default function WorkspaceShell({
   }, [workspace.id, member.user_id]);
 
   return (
-    <WorkspaceProvider workspace={workspace} member={member}>
+    <WorkspaceProvider workspace={workspace} member={member} teams={teams}>
       <TourProvider>
         <div className="flex flex-1 flex-col">
           <WorkspaceNav />

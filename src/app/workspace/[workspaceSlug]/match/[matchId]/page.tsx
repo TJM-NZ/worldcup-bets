@@ -5,7 +5,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import { Match, Team, Bet, Prediction, ExactScoreBet, ExactScoreBetWithMember } from "@/lib/types";
+import { Match, Bet, Prediction, ExactScoreBet, ExactScoreBetWithMember } from "@/lib/types";
 import { isBettingOpen, isDrawAvailable, RESULT_POINTS, EXACT_SCORE_POINTS } from "@/lib/betting";
 import BetForm from "@/components/BetForm";
 import ScoreBetForm from "@/components/ScoreBetForm";
@@ -14,10 +14,8 @@ import CountdownTimer from "@/components/CountdownTimer";
 export default function MatchDetailPage({ params }: { params: Promise<{ matchId: string }> }) {
   const { matchId } = use(params);
   const router = useRouter();
-  const { workspace, member } = useWorkspace();
+  const { workspace, member, teams } = useWorkspace();
   const [match, setMatch] = useState<Match | null>(null);
-  const [homeTeam, setHomeTeam] = useState<Team | null>(null);
-  const [awayTeam, setAwayTeam] = useState<Team | null>(null);
   const [userBet, setUserBet] = useState<Bet | null>(null);
   const [allBets, setAllBets] = useState<Array<Bet & { member: { display_name: string } }>>([]);
   const [userScoreBet, setUserScoreBet] = useState<ExactScoreBet | null>(null);
@@ -39,23 +37,6 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
 
       if (!matchData) return;
       setMatch(matchData);
-
-      if (matchData.home_team_id) {
-        const { data } = await supabase
-          .from("teams")
-          .select("*")
-          .eq("id", matchData.home_team_id)
-          .single();
-        setHomeTeam(data);
-      }
-      if (matchData.away_team_id) {
-        const { data } = await supabase
-          .from("teams")
-          .select("*")
-          .eq("id", matchData.away_team_id)
-          .single();
-        setAwayTeam(data);
-      }
     }
 
     load();
@@ -163,6 +144,9 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
       supabase.removeChannel(channel);
     };
   }, [matchId, member.id, workspace.id]);
+
+  const homeTeam = match?.home_team_id != null ? (teams.get(match.home_team_id) ?? null) : null;
+  const awayTeam = match?.away_team_id != null ? (teams.get(match.away_team_id) ?? null) : null;
 
   if (!match) {
     return (
