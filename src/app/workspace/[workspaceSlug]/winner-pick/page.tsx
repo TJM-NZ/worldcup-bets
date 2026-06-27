@@ -16,7 +16,7 @@ const AI_MODELS = [
 type AiModelKey = (typeof AI_MODELS)[number]["key"];
 
 export default function WinnerPickPage() {
-  const { member } = useWorkspace();
+  const { member, teams } = useWorkspace();
   const [pick, setPick] = useState<(WinnerPick & { team?: Team; ai_model_pick?: string }) | null>(
     null
   );
@@ -31,22 +31,14 @@ export default function WinnerPickPage() {
       .select("*")
       .eq("member_id", member.id)
       .maybeSingle()
-      .then(async ({ data }) => {
+      .then(({ data }) => {
         if (data) {
-          if (data.team_id) {
-            const { data: team } = await supabase
-              .from("teams")
-              .select("*")
-              .eq("id", data.team_id)
-              .single();
-            setPick({ ...data, team: team || undefined });
-          } else {
-            setPick(data);
-          }
+          const team = data.team_id ? teams.get(data.team_id) : undefined;
+          setPick({ ...data, team });
         }
         setLoading(false);
       });
-  }, [member.id]);
+  }, [member.id, teams]);
 
   async function pickAiModel(model: AiModelKey) {
     setSavingAi(true);

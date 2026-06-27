@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
-import { Match, Team, Bet } from "@/lib/types";
+import { Match, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import NextUpStrip from "@/components/NextUpStrip";
 import GroupStandings from "@/components/GroupStandings";
@@ -11,9 +11,8 @@ import GroupStandings from "@/components/GroupStandings";
 type Filter = "all" | "upcoming" | "live" | "finished" | "standings";
 
 export default function MatchesPage() {
-  const { workspace, member } = useWorkspace();
+  const { workspace, member, teams } = useWorkspace();
   const [matches, setMatches] = useState<Match[]>([]);
-  const [teams, setTeams] = useState<Map<number, Team>>(new Map());
   const [bets, setBets] = useState<Map<number, Bet>>(new Map());
   const [filter, setFilter] = useState<Filter>("all");
 
@@ -27,13 +26,6 @@ export default function MatchesPage() {
         .order("utc_date", { ascending: true });
 
       if (matchData) setMatches(matchData);
-
-      const { data: teamData } = await supabase.from("teams").select("*");
-      if (teamData) {
-        const map = new Map<number, Team>();
-        teamData.forEach((t) => map.set(t.id, t));
-        setTeams(map);
-      }
     }
 
     load();

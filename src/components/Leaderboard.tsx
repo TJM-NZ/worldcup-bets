@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useWorkspace } from "@/lib/workspace-context";
 import PointsBadge from "./PointsBadge";
 
 interface LeaderboardEntry {
@@ -48,6 +49,7 @@ export default function Leaderboard({
   workspaceId: string;
   currentMemberId?: string;
 }) {
+  const { teams } = useWorkspace();
   const [members, setMembers] = useState<LeaderboardEntry[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [betsCache, setBetsCache] = useState<Record<string, BetDetail[]>>({});
@@ -192,25 +194,11 @@ export default function Leaderboard({
       .select("id, utc_date, home_team_id, away_team_id")
       .in("id", allMatchIds);
 
-    const teamIds = [
-      ...new Set(
-        (matchData ?? [])
-          .flatMap((m) => [m.home_team_id, m.away_team_id])
-          .filter((id): id is number => id !== null)
-      ),
-    ];
-
-    const { data: teamData } =
-      teamIds.length > 0
-        ? await supabase.from("teams").select("id, name, tla").in("id", teamIds)
-        : { data: [] };
-
     const matchMap = new Map((matchData ?? []).map((m) => [m.id, m]));
-    const teamMap = new Map((teamData ?? []).map((t) => [t.id, t]));
 
     function teamLabel(id: number | null): string {
       if (!id) return "TBD";
-      const t = teamMap.get(id);
+      const t = teams.get(id);
       return t?.tla || t?.name || "?";
     }
 
