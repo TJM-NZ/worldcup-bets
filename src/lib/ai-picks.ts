@@ -336,17 +336,27 @@ export async function resolveAiPicks(
 ): Promise<void> {
   const supabase = createServiceClient();
 
-  const { data: bets } = await supabase
-    .from("bets")
-    .select("id, member_id, prediction")
-    .eq("match_id", matchId)
-    .eq("resolved", false)
-    .in(
-      "member_id",
-      (
-        await supabase.from("members").select("id").eq("is_ai", true).eq("is_global", true)
-      ).data?.map((m) => m.id) ?? []
-    );
+  const { data: aiMembers } = await supabase
+    .from("members")
+    .select("id")
+    .eq("is_ai", true)
+    .eq("is_global", true);
+  const aiMemberIds = aiMembers?.map((m) => m.id) ?? [];
+
+  const [{ data: bets }, { data: scoreBets }] = await Promise.all([
+    supabase
+      .from("bets")
+      .select("id, member_id, prediction")
+      .eq("match_id", matchId)
+      .eq("resolved", false)
+      .in("member_id", aiMemberIds),
+    supabase
+      .from("exact_score_bets")
+      .select("id, member_id, predicted_home, predicted_away")
+      .eq("match_id", matchId)
+      .eq("resolved", false)
+      .in("member_id", aiMemberIds),
+  ]);
 
   for (const bet of bets ?? []) {
     const pts = bet.prediction === winner ? RESULT_POINTS : 0;
@@ -354,18 +364,6 @@ export async function resolveAiPicks(
     if (pts > 0)
       await supabase.rpc("increment_points", { p_member_id: bet.member_id, p_amount: pts });
   }
-
-  const { data: scoreBets } = await supabase
-    .from("exact_score_bets")
-    .select("id, member_id, predicted_home, predicted_away")
-    .eq("match_id", matchId)
-    .eq("resolved", false)
-    .in(
-      "member_id",
-      (
-        await supabase.from("members").select("id").eq("is_ai", true).eq("is_global", true)
-      ).data?.map((m) => m.id) ?? []
-    );
 
   for (const bet of scoreBets ?? []) {
     const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
