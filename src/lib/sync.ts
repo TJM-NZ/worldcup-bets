@@ -134,7 +134,20 @@ async function resolveMatch(
   const predLabel = (pred: string) =>
     pred === "HOME" ? homeTla : pred === "AWAY" ? awayTla : "Draw";
 
-  let totalResolved = 0;
+  // Fetch result bets and score bets in parallel
+  const [{ data: bets }, { data: scoreBets }] = await Promise.all([
+    supabase
+      .from("bets")
+      .select("id, member_id, prediction")
+      .eq("match_id", matchId)
+      .eq("resolved", false),
+    supabase
+      .from("exact_score_bets")
+      .select("id, member_id, predicted_home, predicted_away")
+      .eq("match_id", matchId)
+      .eq("resolved", false),
+  ]);
+
   const notifRows: {
     member_id: string;
     type: string;
@@ -143,23 +156,14 @@ async function resolveMatch(
     match_id: number;
     points_delta: number;
   }[] = [];
+  let totalResolved = 0;
 
-  // Resolve result bets (+3 correct, 0 wrong)
-  const { data: bets } = await supabase
-    .from("bets")
-    .select("id, member_id, prediction")
-    .eq("match_id", matchId)
-    .eq("resolved", false);
+  // Partition result bets and build notif rows
+  const resultWinners = (bets ?? []).filter((b) => b.prediction === winner);
+  const resultLosers = (bets ?? []).filter((b) => b.prediction !== winner);
 
   for (const bet of bets ?? []) {
     const points_won = bet.prediction === winner ? RESULT_POINTS : 0;
-    await supabase.from("bets").update({ resolved: true, points_won }).eq("id", bet.id);
-    if (points_won > 0) {
-      await supabase.rpc("increment_points", {
-        p_member_id: bet.member_id,
-        p_amount: points_won,
-      });
-    }
     notifRows.push({
       member_id: bet.member_id,
       type: points_won > 0 ? "bet_won" : "bet_lost",
@@ -174,23 +178,17 @@ async function resolveMatch(
     totalResolved++;
   }
 
-  // Resolve exact score bets (+5 if correct)
-  const { data: scoreBets } = await supabase
-    .from("exact_score_bets")
-    .select("id, member_id, predicted_home, predicted_away")
-    .eq("match_id", matchId)
-    .eq("resolved", false);
+  // Partition score bets and build notif rows
+  const scoreWinners = (scoreBets ?? []).filter(
+    (b) => b.predicted_home === homeScore && b.predicted_away === awayScore
+  );
+  const scoreLosers = (scoreBets ?? []).filter(
+    (b) => !(b.predicted_home === homeScore && b.predicted_away === awayScore)
+  );
 
   for (const bet of scoreBets ?? []) {
     const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
     const points_won = correct ? EXACT_SCORE_POINTS : 0;
-    await supabase.from("exact_score_bets").update({ resolved: true, points_won }).eq("id", bet.id);
-    if (points_won > 0) {
-      await supabase.rpc("increment_points", {
-        p_member_id: bet.member_id,
-        p_amount: points_won,
-      });
-    }
     notifRows.push({
       member_id: bet.member_id,
       type: correct ? "score_bet_won" : "score_bet_lost",
@@ -204,9 +202,66 @@ async function resolveMatch(
     totalResolved++;
   }
 
-  if (notifRows.length > 0) {
-    await supabase.from("notifications").insert(notifRows);
+  // Execute all DB writes in parallel
+  const writeOps: PromiseLike<unknown>[] = [];
+  if (resultWinners.length > 0) {
+    writeOps.push(
+      supabase
+        .from("bets")
+        .update({ resolved: true, points_won: RESULT_POINTS })
+        .in(
+          "id",
+          resultWinners.map((b) => b.id)
+        )
+    );
+    resultWinners.forEach((b) =>
+      writeOps.push(
+        supabase.rpc("increment_points", { p_member_id: b.member_id, p_amount: RESULT_POINTS })
+      )
+    );
   }
+  if (resultLosers.length > 0) {
+    writeOps.push(
+      supabase
+        .from("bets")
+        .update({ resolved: true, points_won: 0 })
+        .in(
+          "id",
+          resultLosers.map((b) => b.id)
+        )
+    );
+  }
+  if (scoreWinners.length > 0) {
+    writeOps.push(
+      supabase
+        .from("exact_score_bets")
+        .update({ resolved: true, points_won: EXACT_SCORE_POINTS })
+        .in(
+          "id",
+          scoreWinners.map((b) => b.id)
+        )
+    );
+    scoreWinners.forEach((b) =>
+      writeOps.push(
+        supabase.rpc("increment_points", { p_member_id: b.member_id, p_amount: EXACT_SCORE_POINTS })
+      )
+    );
+  }
+  if (scoreLosers.length > 0) {
+    writeOps.push(
+      supabase
+        .from("exact_score_bets")
+        .update({ resolved: true, points_won: 0 })
+        .in(
+          "id",
+          scoreLosers.map((b) => b.id)
+        )
+    );
+  }
+  if (notifRows.length > 0) {
+    writeOps.push(supabase.from("notifications").insert(notifRows));
+  }
+  await Promise.all(writeOps);
 
   await resolveAiPicks(matchId, winner, homeScore, awayScore);
 
