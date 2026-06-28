@@ -94,16 +94,17 @@ export default function ManagePage() {
       const teamIds = [
         ...new Set((matches ?? []).flatMap((m) => [m.home_team_id, m.away_team_id])),
       ];
-      const { data: teams } = await supabase.from("teams").select("id, name").in("id", teamIds);
+      const [{ data: teams }, { data: scoreBets }] = await Promise.all([
+        supabase.from("teams").select("id, name").in("id", teamIds),
+        supabase
+          .from("exact_score_bets")
+          .select("member_id, match_id, predicted_home, predicted_away, points_won, resolved")
+          .in("member_id", memberIds)
+          .in("match_id", matchIds),
+      ]);
       const teamMap = new Map(teams?.map((t) => [t.id, t.name]) ?? []);
 
       const matchMap = new Map((matches ?? []).map((m) => [m.id, m]));
-
-      const { data: scoreBets } = await supabase
-        .from("exact_score_bets")
-        .select("member_id, match_id, predicted_home, predicted_away, points_won, resolved")
-        .in("member_id", memberIds)
-        .in("match_id", matchIds);
 
       const scoreByKey = new Map((scoreBets ?? []).map((s) => [`${s.member_id}:${s.match_id}`, s]));
 

@@ -228,25 +228,23 @@ export async function generateAiPicks(model?: string): Promise<number> {
     matches.flatMap((m) => [m.home_team_id, m.away_team_id]).filter(Boolean) as number[]
   );
   const teamIds = [...teamIdsSet];
-  const { data: teams } = await supabase.from("teams").select("id, name").in("id", teamIds);
+  const [{ data: teams }, { data: standingsRows }, { data: finishedMatches }] = await Promise.all([
+    supabase.from("teams").select("id, name").in("id", teamIds),
+    supabase
+      .from("group_standings")
+      .select(
+        "team_id, position, points, won, drawn, lost, goals_for, goals_against, goal_difference"
+      ),
+    supabase
+      .from("matches")
+      .select("home_team_id, away_team_id, home_score, away_score, stage")
+      .eq("status", "FINISHED")
+      .or(teamIds.map((id) => `home_team_id.eq.${id},away_team_id.eq.${id}`).join(","))
+      .order("utc_date", { ascending: false })
+      .limit(50),
+  ]);
   const teamMap = new Map(teams?.map((t) => [t.id, t.name]) ?? []);
-
-  // Group standings lookup (keyed by team_id)
-  const { data: standingsRows } = await supabase
-    .from("group_standings")
-    .select(
-      "team_id, position, points, won, drawn, lost, goals_for, goals_against, goal_difference"
-    );
   const standingsMap = new Map(standingsRows?.map((s) => [s.team_id, s]) ?? []);
-
-  // Recent match history for each team (last 5 finished matches per team)
-  const { data: finishedMatches } = await supabase
-    .from("matches")
-    .select("home_team_id, away_team_id, home_score, away_score, stage")
-    .eq("status", "FINISHED")
-    .or(teamIds.map((id) => `home_team_id.eq.${id},away_team_id.eq.${id}`).join(","))
-    .order("utc_date", { ascending: false })
-    .limit(50);
 
   // Build per-team history (up to 5 most recent)
   const historyMap = new Map<number, MatchResult[]>();
