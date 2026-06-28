@@ -4,6 +4,35 @@ import { GoogleGenAI } from "@google/genai";
 import { createServiceClient } from "./supabase/server";
 import { RESULT_POINTS, EXACT_SCORE_POINTS } from "./betting";
 
+// Module-level singletons — reused across warm Vercel function invocations
+let _anthropic: Anthropic | null = null;
+let _grok: OpenAI | null = null;
+let _gemini: GoogleGenAI | null = null;
+let _deepseek: OpenAI | null = null;
+
+function getAnthropic(): Anthropic | null {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  return (_anthropic ??= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }));
+}
+function getGrok(): OpenAI | null {
+  if (!process.env.XAI_API_KEY) return null;
+  return (_grok ??= new OpenAI({
+    apiKey: process.env.XAI_API_KEY,
+    baseURL: "https://api.x.ai/v1",
+  }));
+}
+function getGemini(): GoogleGenAI | null {
+  if (!process.env.GOOGLE_AI_API_KEY) return null;
+  return (_gemini ??= new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY }));
+}
+function getDeepSeek(): OpenAI | null {
+  if (!process.env.DEEPSEEK_API_KEY) return null;
+  return (_deepseek ??= new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY,
+    baseURL: "https://api.deepseek.com",
+  }));
+}
+
 type AiModel = "claude" | "grok" | "gemini" | "deepseek";
 
 interface AiPick {
@@ -103,8 +132,8 @@ function parseJson(text: string): AiPick | null {
 }
 
 async function callClaude(prompt: string): Promise<AiPick | null> {
-  if (!process.env.ANTHROPIC_API_KEY) return null;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const client = getAnthropic();
+  if (!client) return null;
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 128,
@@ -115,8 +144,8 @@ async function callClaude(prompt: string): Promise<AiPick | null> {
 }
 
 async function callGrok(prompt: string): Promise<AiPick | null> {
-  if (!process.env.XAI_API_KEY) return null;
-  const client = new OpenAI({ apiKey: process.env.XAI_API_KEY, baseURL: "https://api.x.ai/v1" });
+  const client = getGrok();
+  if (!client) return null;
   const res = await client.chat.completions.create({
     model: "grok-3-mini",
     max_tokens: 128,
@@ -127,8 +156,8 @@ async function callGrok(prompt: string): Promise<AiPick | null> {
 }
 
 async function callGemini(prompt: string): Promise<AiPick | null> {
-  if (!process.env.GOOGLE_AI_API_KEY) return null;
-  const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY });
+  const ai = getGemini();
+  if (!ai) return null;
   const res = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
@@ -151,11 +180,8 @@ async function callGemini(prompt: string): Promise<AiPick | null> {
 }
 
 async function callDeepSeek(prompt: string): Promise<AiPick | null> {
-  if (!process.env.DEEPSEEK_API_KEY) return null;
-  const client = new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY,
-    baseURL: "https://api.deepseek.com",
-  });
+  const client = getDeepSeek();
+  if (!client) return null;
   const res = await client.chat.completions.create({
     model: "deepseek-chat",
     max_tokens: 128,
@@ -294,28 +320,29 @@ export async function generateAiPicks(model?: string): Promise<number> {
           pick.result = pick.home_score >= pick.away_score ? "HOME" : "AWAY";
         }
 
-        await supabase.from("bets").upsert(
-          {
-            member_id: member.id,
-            match_id: match.id,
-            prediction: pick.result,
-            points_won: 0,
-            resolved: false,
-          },
-          { onConflict: "member_id,match_id" }
-        );
-
-        await supabase.from("exact_score_bets").upsert(
-          {
-            member_id: member.id,
-            match_id: match.id,
-            predicted_home: pick.home_score,
-            predicted_away: pick.away_score,
-            points_won: 0,
-            resolved: false,
-          },
-          { onConflict: "member_id,match_id" }
-        );
+        await Promise.all([
+          supabase.from("bets").upsert(
+            {
+              member_id: member.id,
+              match_id: match.id,
+              prediction: pick.result,
+              points_won: 0,
+              resolved: false,
+            },
+            { onConflict: "member_id,match_id" }
+          ),
+          supabase.from("exact_score_bets").upsert(
+            {
+              member_id: member.id,
+              match_id: match.id,
+              predicted_home: pick.home_score,
+              predicted_away: pick.away_score,
+              points_won: 0,
+              resolved: false,
+            },
+            { onConflict: "member_id,match_id" }
+          ),
+        ]);
 
         count++;
       }
@@ -358,21 +385,69 @@ export async function resolveAiPicks(
       .in("member_id", aiMemberIds),
   ]);
 
-  for (const bet of bets ?? []) {
-    const pts = bet.prediction === winner ? RESULT_POINTS : 0;
-    await supabase.from("bets").update({ resolved: true, points_won: pts }).eq("id", bet.id);
-    if (pts > 0)
-      await supabase.rpc("increment_points", { p_member_id: bet.member_id, p_amount: pts });
-  }
+  const aiWinners = (bets ?? []).filter((b) => b.prediction === winner);
+  const aiLosers = (bets ?? []).filter((b) => b.prediction !== winner);
+  const scoreWinners = (scoreBets ?? []).filter(
+    (b) => b.predicted_home === homeScore && b.predicted_away === awayScore
+  );
+  const scoreLosers = (scoreBets ?? []).filter(
+    (b) => !(b.predicted_home === homeScore && b.predicted_away === awayScore)
+  );
 
-  for (const bet of scoreBets ?? []) {
-    const correct = bet.predicted_home === homeScore && bet.predicted_away === awayScore;
-    const pts = correct ? EXACT_SCORE_POINTS : 0;
-    await supabase
-      .from("exact_score_bets")
-      .update({ resolved: true, points_won: pts })
-      .eq("id", bet.id);
-    if (pts > 0)
-      await supabase.rpc("increment_points", { p_member_id: bet.member_id, p_amount: pts });
+  const ops: PromiseLike<unknown>[] = [];
+  if (aiWinners.length > 0) {
+    ops.push(
+      supabase
+        .from("bets")
+        .update({ resolved: true, points_won: RESULT_POINTS })
+        .in(
+          "id",
+          aiWinners.map((b) => b.id)
+        )
+    );
+    aiWinners.forEach((b) =>
+      ops.push(
+        supabase.rpc("increment_points", { p_member_id: b.member_id, p_amount: RESULT_POINTS })
+      )
+    );
   }
+  if (aiLosers.length > 0) {
+    ops.push(
+      supabase
+        .from("bets")
+        .update({ resolved: true, points_won: 0 })
+        .in(
+          "id",
+          aiLosers.map((b) => b.id)
+        )
+    );
+  }
+  if (scoreWinners.length > 0) {
+    ops.push(
+      supabase
+        .from("exact_score_bets")
+        .update({ resolved: true, points_won: EXACT_SCORE_POINTS })
+        .in(
+          "id",
+          scoreWinners.map((b) => b.id)
+        )
+    );
+    scoreWinners.forEach((b) =>
+      ops.push(
+        supabase.rpc("increment_points", { p_member_id: b.member_id, p_amount: EXACT_SCORE_POINTS })
+      )
+    );
+  }
+  if (scoreLosers.length > 0) {
+    ops.push(
+      supabase
+        .from("exact_score_bets")
+        .update({ resolved: true, points_won: 0 })
+        .in(
+          "id",
+          scoreLosers.map((b) => b.id)
+        )
+    );
+  }
+  await Promise.all(ops);
 }

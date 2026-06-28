@@ -84,10 +84,16 @@ export default function Leaderboard({
       );
 
       if (memberIds.length > 0) {
-        const { data: bets } = await supabase
-          .from("bets")
-          .select("member_id, points_won, resolved")
-          .in("member_id", memberIds);
+        const [{ data: bets }, { data: scoreBets }] = await Promise.all([
+          supabase
+            .from("bets")
+            .select("member_id, points_won, resolved")
+            .in("member_id", memberIds),
+          supabase
+            .from("exact_score_bets")
+            .select("member_id, points_won, resolved")
+            .in("member_id", memberIds),
+        ]);
 
         for (const bet of bets ?? []) {
           const s = stats[bet.member_id];
@@ -100,11 +106,6 @@ export default function Leaderboard({
             s.gamesLost++;
           }
         }
-
-        const { data: scoreBets } = await supabase
-          .from("exact_score_bets")
-          .select("member_id, points_won, resolved")
-          .in("member_id", memberIds);
 
         for (const bet of scoreBets ?? []) {
           const s = stats[bet.member_id];
