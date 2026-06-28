@@ -20,21 +20,19 @@ export default function WorkspaceDashboard() {
     const supabase = createClient();
 
     async function load() {
-      // Load member count
-      const { count } = await supabase
-        .from("members")
-        .select("*", { count: "exact", head: true })
-        .eq("workspace_id", workspace.id);
+      const [{ count }, { data: matchData }] = await Promise.all([
+        supabase
+          .from("members")
+          .select("*", { count: "exact", head: true })
+          .eq("workspace_id", workspace.id),
+        supabase
+          .from("matches")
+          .select("*")
+          .in("status", ["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"])
+          .order("utc_date", { ascending: true })
+          .limit(10),
+      ]);
       if (count !== null) setMemberCount(count);
-
-      // Load upcoming & live matches
-      const { data: matchData } = await supabase
-        .from("matches")
-        .select("*")
-        .in("status", ["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"])
-        .order("utc_date", { ascending: true })
-        .limit(10);
-
       if (matchData) setMatches(matchData);
     }
 

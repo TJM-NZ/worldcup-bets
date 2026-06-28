@@ -224,11 +224,10 @@ export async function generateAiPicks(model?: string): Promise<number> {
   if (!matches || matches.length === 0) return 0;
 
   // Team name lookup
-  const teamIds = [
-    ...new Set(
-      matches.flatMap((m) => [m.home_team_id, m.away_team_id]).filter(Boolean) as number[]
-    ),
-  ];
+  const teamIdsSet = new Set<number>(
+    matches.flatMap((m) => [m.home_team_id, m.away_team_id]).filter(Boolean) as number[]
+  );
+  const teamIds = [...teamIdsSet];
   const { data: teams } = await supabase.from("teams").select("id, name").in("id", teamIds);
   const teamMap = new Map(teams?.map((t) => [t.id, t.name]) ?? []);
 
@@ -262,7 +261,7 @@ export async function generateAiPicks(model?: string): Promise<number> {
       stage: m.stage,
     };
     for (const tid of [m.home_team_id, m.away_team_id]) {
-      if (!teamIds.includes(tid)) continue;
+      if (!teamIdsSet.has(tid)) continue;
       const arr = historyMap.get(tid) ?? [];
       if (arr.length < 5) {
         arr.push(result);
