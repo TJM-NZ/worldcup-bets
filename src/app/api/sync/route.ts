@@ -12,14 +12,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ status: "skipped", reason: "Not due yet" });
     }
 
-    // Sync teams (idempotent upsert)
-    const teamsCount = await syncTeams();
+    // Sync teams and standings in parallel (independent; teams must land before matches)
+    const [teamsCount, standingsCount] = await Promise.all([syncTeams(), syncStandings()]);
 
-    // Sync matches and resolve bets
+    // Sync matches and resolve bets (requires teams to be present for FK integrity)
     const { matchesUpdated, betsResolved } = await syncMatches();
-
-    // Sync standings (daily-gated — no-op if updated recently)
-    const standingsCount = await syncStandings();
 
     // Generate AI picks for any upcoming matches not yet covered
     const aiPicks = await generateAiPicks();
