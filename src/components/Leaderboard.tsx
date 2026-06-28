@@ -245,7 +245,7 @@ export default function Leaderboard({
       });
     }
 
-    details.sort((a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime());
+    details.sort((a, b) => (a.matchDate < b.matchDate ? -1 : 1));
 
     setBetsCache((prev) => ({ ...prev, [memberId]: details }));
     setLoadingId(null);

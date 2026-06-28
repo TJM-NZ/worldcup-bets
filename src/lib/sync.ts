@@ -90,18 +90,15 @@ export async function syncMatches(): Promise<{
 
   let betsResolved = 0;
 
-  for (const match of newlyFinished) {
-    betsResolved += await resolveMatch(
-      match.id,
-      match.score.winner!,
-      match.score.fullTime.home!,
-      match.score.fullTime.away!
-    );
-  }
-
-  for (const match of newlyCancelled) {
-    betsResolved += await cancelMatch(match.id);
-  }
+  const [resolvedCounts, cancelledCounts] = await Promise.all([
+    Promise.all(
+      newlyFinished.map((m) =>
+        resolveMatch(m.id, m.score.winner!, m.score.fullTime.home!, m.score.fullTime.away!)
+      )
+    ),
+    Promise.all(newlyCancelled.map((m) => cancelMatch(m.id))),
+  ]);
+  betsResolved = [...resolvedCounts, ...cancelledCounts].reduce((s, n) => s + n, 0);
 
   return { matchesUpdated: rows.length, betsResolved };
 }
@@ -273,39 +270,37 @@ async function cancelMatch(matchId: number): Promise<number> {
   const supabase = createServiceClient();
   let total = 0;
 
-  const { data: bets } = await supabase
-    .from("bets")
-    .select("id")
-    .eq("match_id", matchId)
-    .eq("resolved", false);
+  const [{ data: bets }, { data: scoreBets }] = await Promise.all([
+    supabase.from("bets").select("id").eq("match_id", matchId).eq("resolved", false),
+    supabase.from("exact_score_bets").select("id").eq("match_id", matchId).eq("resolved", false),
+  ]);
 
-  if (bets && bets.length > 0) {
-    await supabase
-      .from("bets")
-      .delete()
-      .in(
-        "id",
-        bets.map((b) => b.id)
-      );
+  const deletes: PromiseLike<unknown>[] = [];
+  if (bets?.length) {
+    deletes.push(
+      supabase
+        .from("bets")
+        .delete()
+        .in(
+          "id",
+          bets.map((b) => b.id)
+        )
+    );
     total += bets.length;
   }
-
-  const { data: scoreBets } = await supabase
-    .from("exact_score_bets")
-    .select("id")
-    .eq("match_id", matchId)
-    .eq("resolved", false);
-
-  if (scoreBets && scoreBets.length > 0) {
-    await supabase
-      .from("exact_score_bets")
-      .delete()
-      .in(
-        "id",
-        scoreBets.map((b) => b.id)
-      );
+  if (scoreBets?.length) {
+    deletes.push(
+      supabase
+        .from("exact_score_bets")
+        .delete()
+        .in(
+          "id",
+          scoreBets.map((b) => b.id)
+        )
+    );
     total += scoreBets.length;
   }
+  await Promise.all(deletes);
 
   return total;
 }
