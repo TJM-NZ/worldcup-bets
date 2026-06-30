@@ -60,38 +60,37 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
     const matchIdNum = parseInt(matchId);
 
     async function loadBets() {
-      const { data: myBet } = await supabase
-        .from("bets")
-        .select("*")
-        .eq("member_id", member.id)
-        .eq("match_id", matchIdNum)
-        .single();
+      const [{ data: myBet }, { data: myScoreBet }, { data: wsMembers }] = await Promise.all([
+        supabase
+          .from("bets")
+          .select("*")
+          .eq("member_id", member.id)
+          .eq("match_id", matchIdNum)
+          .single(),
+        supabase
+          .from("exact_score_bets")
+          .select("*")
+          .eq("member_id", member.id)
+          .eq("match_id", matchIdNum)
+          .single(),
+        supabase.from("members").select("id, display_name").eq("workspace_id", workspace.id),
+      ]);
 
       setUserBet(myBet);
-
-      const { data: myScoreBet } = await supabase
-        .from("exact_score_bets")
-        .select("*")
-        .eq("member_id", member.id)
-        .eq("match_id", matchIdNum)
-        .single();
-
       setUserScoreBet(myScoreBet);
-
-      const { data: wsMembers } = await supabase
-        .from("members")
-        .select("id, display_name")
-        .eq("workspace_id", workspace.id);
 
       if (wsMembers) {
         const memberIds = wsMembers.map((m) => m.id);
         const memberMap = new Map(wsMembers.map((m) => [m.id, m]));
 
-        const { data: betData } = await supabase
-          .from("bets")
-          .select("*")
-          .eq("match_id", matchIdNum)
-          .in("member_id", memberIds);
+        const [{ data: betData }, { data: scoreBetData }] = await Promise.all([
+          supabase.from("bets").select("*").eq("match_id", matchIdNum).in("member_id", memberIds),
+          supabase
+            .from("exact_score_bets")
+            .select("*")
+            .eq("match_id", matchIdNum)
+            .in("member_id", memberIds),
+        ]);
 
         if (betData) {
           setAllBets(
@@ -101,13 +100,6 @@ export default function MatchDetailPage({ params }: { params: Promise<{ matchId:
             }))
           );
         }
-
-        const { data: scoreBetData } = await supabase
-          .from("exact_score_bets")
-          .select("*")
-          .eq("match_id", matchIdNum)
-          .in("member_id", memberIds);
-
         if (scoreBetData) {
           setAllScoreBets(
             scoreBetData.map((b) => ({

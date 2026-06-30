@@ -53,21 +53,21 @@ export async function POST(request: Request) {
     );
   }
 
-  // Check for existing pick
+  // Check for existing pick with a team already set (row may exist from AI model pick with no team)
   const { data: existingPick } = await supabase
     .from("winner_picks")
-    .select("id")
+    .select("id, team_id")
     .eq("member_id", memberId)
-    .single();
+    .maybeSingle();
 
-  if (existingPick) {
+  if (existingPick?.team_id) {
     return NextResponse.json({ error: "You already made a winner pick" }, { status: 400 });
   }
 
-  // Insert pick
+  // Upsert pick — handles the case where a row already exists from an AI model pick
   const { data: pick, error } = await supabase
     .from("winner_picks")
-    .insert({ member_id: memberId, team_id: teamId })
+    .upsert({ member_id: memberId, team_id: teamId }, { onConflict: "member_id" })
     .select()
     .single();
 

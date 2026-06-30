@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Bet } from "@/lib/types";
@@ -62,26 +62,32 @@ export default function MatchesPage() {
       });
   }, [member.id]);
 
-  const filtered = matches.filter((m) => {
-    switch (filter) {
-      case "upcoming":
-        return m.status === "TIMED" || m.status === "SCHEDULED";
-      case "live":
-        return m.status === "IN_PLAY" || m.status === "PAUSED";
-      case "finished":
-        return m.status === "FINISHED";
-      default:
-        return true;
-    }
-  });
+  const filtered = useMemo(
+    () =>
+      matches.filter((m) => {
+        switch (filter) {
+          case "upcoming":
+            return m.status === "TIMED" || m.status === "SCHEDULED";
+          case "live":
+            return m.status === "IN_PLAY" || m.status === "PAUSED";
+          case "finished":
+            return m.status === "FINISHED";
+          default:
+            return true;
+        }
+      }),
+    [matches, filter]
+  );
 
-  // Group by stage (only used for match list views)
-  const grouped = new Map<string, Match[]>();
-  for (const m of filtered) {
-    const key = (m.group_name || m.stage).replace(/_/g, " ");
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key)!.push(m);
-  }
+  const grouped = useMemo(() => {
+    const map = new Map<string, Match[]>();
+    for (const m of filtered) {
+      const key = (m.group_name || m.stage).replace(/_/g, " ");
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(m);
+    }
+    return map;
+  }, [filtered]);
 
   const showNextUp = filter === "all" || filter === "upcoming" || filter === "live";
 
