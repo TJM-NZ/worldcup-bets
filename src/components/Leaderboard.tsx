@@ -19,16 +19,25 @@ interface LeaderboardEntry {
   exactScoreWins: number;
 }
 
-interface BetDetail {
-  type: "result" | "score";
+interface MatchBet {
+  matchId: number;
   matchDate: string;
   homeLabel: string;
   awayLabel: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  winner: string | null;
+  // result pick
+  hasResult: boolean;
   prediction?: string;
+  resultResolved: boolean;
+  resultPointsWon: number;
+  // score pick
+  hasScore: boolean;
   predictedHome?: number;
   predictedAway?: number;
-  pointsWon: number;
-  resolved: boolean;
+  scoreResolved: boolean;
+  scorePointsWon: number;
 }
 
 function pct(num: number, denom: number): string | null {
@@ -52,7 +61,7 @@ export default function Leaderboard({
   const { teams } = useWorkspace();
   const [members, setMembers] = useState<LeaderboardEntry[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [betsCache, setBetsCache] = useState<Record<string, BetDetail[]>>({});
+  const [betsCache, setBetsCache] = useState<Record<string, MatchBet[]>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -203,7 +212,7 @@ export default function Leaderboard({
 
     const { data: matchData } = await supabase
       .from("matches")
-      .select("id, utc_date, home_team_id, away_team_id")
+      .select("id, utc_date, home_team_id, away_team_id, home_score, away_score, winner")
       .in("id", allMatchIds);
 
     const matchMap = new Map((matchData ?? []).map((m) => [m.id, m]));
@@ -214,38 +223,53 @@ export default function Leaderboard({
       return t?.tla || t?.name || "?";
     }
 
-    const details: BetDetail[] = [];
+    // Merge result + score bets into one entry per match
+    const byMatch = new Map<number, MatchBet>();
 
-    for (const bet of betsRes.data ?? []) {
-      const match = matchMap.get(bet.match_id);
-      if (!match) continue;
-      details.push({
-        type: "result",
+    function entryFor(matchId: number): MatchBet | null {
+      const existing = byMatch.get(matchId);
+      if (existing) return existing;
+      const match = matchMap.get(matchId);
+      if (!match) return null;
+      const entry: MatchBet = {
+        matchId,
         matchDate: match.utc_date,
         homeLabel: teamLabel(match.home_team_id),
         awayLabel: teamLabel(match.away_team_id),
-        prediction: bet.prediction,
-        pointsWon: bet.points_won,
-        resolved: bet.resolved,
-      });
+        homeScore: match.home_score,
+        awayScore: match.away_score,
+        winner: match.winner,
+        hasResult: false,
+        resultResolved: false,
+        resultPointsWon: 0,
+        hasScore: false,
+        scoreResolved: false,
+        scorePointsWon: 0,
+      };
+      byMatch.set(matchId, entry);
+      return entry;
+    }
+
+    for (const bet of betsRes.data ?? []) {
+      const entry = entryFor(bet.match_id);
+      if (!entry) continue;
+      entry.hasResult = true;
+      entry.prediction = bet.prediction;
+      entry.resultResolved = bet.resolved;
+      entry.resultPointsWon = bet.points_won;
     }
 
     for (const bet of scoreBetsRes.data ?? []) {
-      const match = matchMap.get(bet.match_id);
-      if (!match) continue;
-      details.push({
-        type: "score",
-        matchDate: match.utc_date,
-        homeLabel: teamLabel(match.home_team_id),
-        awayLabel: teamLabel(match.away_team_id),
-        predictedHome: bet.predicted_home,
-        predictedAway: bet.predicted_away,
-        pointsWon: bet.points_won,
-        resolved: bet.resolved,
-      });
+      const entry = entryFor(bet.match_id);
+      if (!entry) continue;
+      entry.hasScore = true;
+      entry.predictedHome = bet.predicted_home;
+      entry.predictedAway = bet.predicted_away;
+      entry.scoreResolved = bet.resolved;
+      entry.scorePointsWon = bet.points_won;
     }
 
-    details.sort((a, b) => (a.matchDate < b.matchDate ? -1 : 1));
+    const details = [...byMatch.values()].sort((a, b) => (a.matchDate < b.matchDate ? -1 : 1));
 
     setBetsCache((prev) => ({ ...prev, [memberId]: details }));
     setLoadingId(null);
@@ -357,37 +381,57 @@ export default function Leaderboard({
                 )}
                 {!isLoading && betDetails && betDetails.length > 0 && (
                   <div className="space-y-1.5">
-                    {betDetails.map((bet, j) => (
-                      <div key={j} className="flex items-center gap-2 text-xs">
-                        <span className="text-silver min-w-0 flex-1 truncate">
-                          {bet.homeLabel} vs {bet.awayLabel}
-                        </span>
-                        {bet.type === "result" ? (
-                          <span className="text-silver shrink-0 font-mono">
-                            {predictionLabel(bet.prediction!, bet.homeLabel, bet.awayLabel)}
+                    {betDetails.map((bet) => {
+                      const hasResultScore = bet.homeScore !== null && bet.awayScore !== null;
+                      // A stored draw with a decisive winner means it was settled on penalties
+                      const wonOnPens =
+                        hasResultScore &&
+                        bet.homeScore === bet.awayScore &&
+                        (bet.winner === "HOME_TEAM" || bet.winner === "AWAY_TEAM");
+                      return (
+                        <div key={bet.matchId} className="flex items-center gap-2 text-xs">
+                          <span className="text-silver min-w-0 flex-1 truncate">
+                            {bet.homeLabel} vs {bet.awayLabel}
                           </span>
-                        ) : (
-                          <span className="text-silver shrink-0 font-mono">
-                            {bet.predictedHome}–{bet.predictedAway}
+                          <span className="shrink-0 font-mono font-medium">
+                            {hasResultScore ? `${bet.homeScore}–${bet.awayScore}` : "–"}
+                            {wonOnPens && (
+                              <span className="text-silver ml-1 font-sans font-normal">
+                                ({bet.winner === "HOME_TEAM" ? bet.homeLabel : bet.awayLabel} pens)
+                              </span>
+                            )}
                           </span>
-                        )}
-                        {!bet.resolved ? (
-                          <span className="text-silver shrink-0">–</span>
-                        ) : bet.pointsWon > 0 ? (
-                          bet.type === "score" ? (
-                            <span className="text-accent shrink-0 font-medium">
-                              ★ +{bet.pointsWon}
+                          {bet.hasResult && (
+                            <span className="flex shrink-0 items-center gap-0.5 font-mono">
+                              <span className="text-silver">
+                                {predictionLabel(bet.prediction!, bet.homeLabel, bet.awayLabel)}
+                              </span>
+                              {!bet.resultResolved ? (
+                                <span className="text-silver">–</span>
+                              ) : bet.resultPointsWon > 0 ? (
+                                <span className="text-emerald-500 dark:text-emerald-400">✓</span>
+                              ) : (
+                                <span className="text-red-500 dark:text-red-400">✗</span>
+                              )}
                             </span>
-                          ) : (
-                            <span className="shrink-0 text-emerald-500 dark:text-emerald-400">
-                              ✓ +{bet.pointsWon}
+                          )}
+                          {bet.hasScore && (
+                            <span className="flex shrink-0 items-center gap-0.5 font-mono">
+                              <span className="text-silver">
+                                {bet.predictedHome}–{bet.predictedAway}
+                              </span>
+                              {!bet.scoreResolved ? (
+                                <span className="text-silver">–</span>
+                              ) : bet.scorePointsWon > 0 ? (
+                                <span className="text-accent">★</span>
+                              ) : (
+                                <span className="text-red-500 dark:text-red-400">✗</span>
+                              )}
                             </span>
-                          )
-                        ) : (
-                          <span className="shrink-0 text-red-500 dark:text-red-400">✗</span>
-                        )}
-                      </div>
-                    ))}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

@@ -38,3 +38,19 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+@keyframes trophy-spin {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(360deg) scale(1.2);
+  }
+  100% {
+    transform: rotate(720deg) scale(1);
+  }
+}
+
+.animate-trophy-spin {
+  animation: trophy-spin 1s ease-in-out;
+}
