@@ -111,7 +111,13 @@ export interface FdMatch {
   homeTeam: { id: number | null; name: string | null };
   awayTeam: { id: number | null; name: string | null };
   score: {
+    // NOTE: football-data.org sums the penalty shootout goals into `fullTime`
+    // (e.g. a 1–1 game won 4–3 on pens reports fullTime 5–4). Use `penalties`
+    // to strip them back out to the real football score. `duration` is
+    // "REGULAR" | "EXTRA_TIME" | "PENALTY_SHOOTOUT".
     fullTime: { home: number | null; away: number | null };
+    penalties?: { home: number | null; away: number | null } | null;
+    duration?: string | null;
     winner: string | null;
   };
 }

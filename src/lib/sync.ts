@@ -35,6 +35,38 @@ export async function syncTeams(): Promise<number> {
   return rows.length;
 }
 
+/**
+ * The real football scoreline to store/display and judge exact-score bets against.
+ * football-data.org folds penalty-shootout goals into `fullTime`, so for a shootout
+ * we subtract them back out to recover the pre-shootout score (a draw). Extra-time
+ * goals stay (fullTime is the legitimate final score for ET games).
+ */
+function realScore(score: FdMatch["score"]): { home: number | null; away: number | null } {
+  const { fullTime, penalties, duration } = score;
+  if (
+    duration === "PENALTY_SHOOTOUT" &&
+    penalties &&
+    fullTime.home !== null &&
+    fullTime.away !== null &&
+    penalties.home !== null &&
+    penalties.away !== null
+  ) {
+    return { home: fullTime.home - penalties.home, away: fullTime.away - penalties.away };
+  }
+  return { home: fullTime.home, away: fullTime.away };
+}
+
+/**
+ * Whether a finished match's result is actually settled and safe to resolve bets on.
+ * A knockout game can never end in a draw, so `winner === "DRAW"` (or null) on a
+ * non-group match means the shootout result hasn't landed yet — wait for it.
+ */
+function isDecisiveWinner(winner: string | null, stage: string): boolean {
+  if (winner === "HOME_TEAM" || winner === "AWAY_TEAM") return true;
+  if (winner === "DRAW" && stage === "GROUP_STAGE") return true;
+  return false;
+}
+
 /** Sync matches and resolve finished bets */
 export async function syncMatches(): Promise<{
   matchesUpdated: number;
@@ -52,33 +84,57 @@ export async function syncMatches(): Promise<{
   }
 
   // Upsert matches
-  const rows = apiMatches.map((m: FdMatch) => ({
-    id: m.id,
-    utc_date: m.utcDate,
-    status: m.status,
-    stage: m.stage,
-    group_name: m.group,
-    matchday: m.matchday,
-    home_team_id: m.homeTeam.id,
-    away_team_id: m.awayTeam.id,
-    home_score: m.score.fullTime.home,
-    away_score: m.score.fullTime.away,
-    winner: m.score.winner,
-  }));
+  const rows = apiMatches.map((m: FdMatch) => {
+    const score = realScore(m.score);
+    return {
+      id: m.id,
+      utc_date: m.utcDate,
+      status: m.status,
+      stage: m.stage,
+      group_name: m.group,
+      matchday: m.matchday,
+      home_team_id: m.homeTeam.id,
+      away_team_id: m.awayTeam.id,
+      home_score: score.home,
+      away_score: score.away,
+      winner: m.score.winner,
+    };
+  });
 
   const { error: upsertError } = await supabase.from("matches").upsert(rows, { onConflict: "id" });
 
   if (upsertError) throw new Error(`Match sync failed: ${upsertError.message}`);
 
-  // Find newly finished matches (need winner AND scores for exact score resolution)
-  const newlyFinished = apiMatches.filter(
+  // Candidate matches whose result is genuinely decided. We key off the *decisive
+  // winner* rather than the FINISHED status transition: a knockout game briefly
+  // reports FINISHED with a null/DRAW winner while the shootout is scored, and
+  // resolving on that edge either skips the match forever or marks everyone a loss.
+  const decided = apiMatches.filter(
     (m) =>
       m.status === "FINISHED" &&
-      existingStatusMap.get(m.id) !== "FINISHED" &&
-      m.score.winner &&
+      isDecisiveWinner(m.score.winner, m.stage) &&
       m.score.fullTime.home !== null &&
       m.score.fullTime.away !== null
   );
+
+  // Of the decided matches, resolve only those that still have unresolved bets.
+  // This is idempotent (skips already-resolved matches on later syncs) and
+  // self-healing (a late-arriving penalty winner gets picked up next sync).
+  const decidedIds = decided.map((m) => m.id);
+  const toResolve = new Set<number>();
+  if (decidedIds.length > 0) {
+    const [{ data: unresolvedBets }, { data: unresolvedScoreBets }] = await Promise.all([
+      supabase.from("bets").select("match_id").in("match_id", decidedIds).eq("resolved", false),
+      supabase
+        .from("exact_score_bets")
+        .select("match_id")
+        .in("match_id", decidedIds)
+        .eq("resolved", false),
+    ]);
+    for (const b of unresolvedBets ?? []) toResolve.add(b.match_id);
+    for (const b of unresolvedScoreBets ?? []) toResolve.add(b.match_id);
+  }
+  const newlyFinished = decided.filter((m) => toResolve.has(m.id));
 
   // Find newly postponed/cancelled matches (delete unresolved bets — no penalty)
   const newlyCancelled = apiMatches.filter(
@@ -92,9 +148,10 @@ export async function syncMatches(): Promise<{
 
   const [resolvedCounts, cancelledCounts] = await Promise.all([
     Promise.all(
-      newlyFinished.map((m) =>
-        resolveMatch(m.id, m.score.winner!, m.score.fullTime.home!, m.score.fullTime.away!)
-      )
+      newlyFinished.map((m) => {
+        const score = realScore(m.score);
+        return resolveMatch(m.id, m.score.winner!, score.home!, score.away!);
+      })
     ),
     Promise.all(newlyCancelled.map((m) => cancelMatch(m.id))),
   ]);
