@@ -6,6 +6,7 @@ import { useWorkspace } from "@/lib/workspace-context";
 import { Match, Bet } from "@/lib/types";
 import MatchCard from "@/components/MatchCard";
 import PointsBadge from "@/components/PointsBadge";
+import ChampionTrophy from "@/components/ChampionTrophy";
 
 export default function WorkspaceDashboard() {
   const { workspace, member, teams } = useWorkspace();
@@ -86,6 +87,8 @@ export default function WorkspaceDashboard() {
 
   return (
     <div className="space-y-8">
+      <ChampionTrophy workspaceId={workspace.id} />
+
       {/* Workspace header */}
       <div className="bg-card rounded-xl p-6">
         <div className="flex items-start justify-between">
