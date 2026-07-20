@@ -338,15 +338,20 @@ async function resolveMatch(
 async function resolveWinnerPicks(): Promise<void> {
   const supabase = createServiceClient();
 
-  // Only proceed once the Final has a decisive winner
-  const { data: finalMatch } = await supabase
+  // Find the most recent decisive knockout final. Avoids hard-coding stage = 'FINAL'
+  // in case the API name differs, and avoids maybeSingle() which silently returns
+  // null when more than one row matches.
+  const { data: finalMatches } = await supabase
     .from("matches")
     .select("winner, home_team_id, away_team_id")
-    .eq("stage", "FINAL")
     .eq("status", "FINISHED")
-    .maybeSingle();
+    .in("winner", ["HOME_TEAM", "AWAY_TEAM"])
+    .not("stage", "in", '("GROUP_STAGE","THIRD_PLACE")')
+    .order("utc_date", { ascending: false })
+    .limit(1);
 
-  if (!finalMatch || !isDecisiveWinner(finalMatch.winner, "FINAL")) return;
+  const finalMatch = finalMatches?.[0] ?? null;
+  if (!finalMatch) return;
 
   const { data: unresolvedPicks } = await supabase
     .from("winner_picks")
