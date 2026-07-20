@@ -17,6 +17,27 @@ interface LeaderboardEntry {
   gamesLost: number;
   gamesPending: number;
   exactScoreWins: number;
+  winnerPick: {
+    resolved: boolean;
+    pointsWon: number;
+    aiModelPick: string | null;
+  } | null;
+}
+
+const AI_MODEL_LABELS: Record<string, { label: string; emoji: string }> = {
+  claude: { label: "Claude", emoji: "🟠" },
+  grok: { label: "Grok", emoji: "⚡" },
+  gemini: { label: "Gemini", emoji: "💎" },
+  deepseek: { label: "DeepSeek", emoji: "🌊" },
+};
+
+// winner_picks.points_won encodes both bonuses: team=10, AI=5
+// so: teamCorrect iff points_won ∈ {10,15}, aiCorrect iff points_won ∈ {5,15}
+function teamPickCorrect(pointsWon: number) {
+  return pointsWon === 10 || pointsWon === 15;
+}
+function aiPickCorrect(pointsWon: number) {
+  return pointsWon === 5 || pointsWon === 15;
 }
 
 interface MatchBet {
@@ -71,7 +92,9 @@ export default function Leaderboard({
     async function load() {
       const { data: memberData } = await supabase
         .from("members")
-        .select("id, display_name, points, is_ai, ai_model, winner_picks(teams(crest_url, name))")
+        .select(
+          "id, display_name, points, is_ai, ai_model, winner_picks(resolved, points_won, ai_model_pick, teams(crest_url, name))"
+        )
         .or(`workspace_id.eq.${workspaceId},is_global.eq.true`);
 
       if (!memberData) return;
@@ -133,6 +156,13 @@ export default function Leaderboard({
           ...stats[m.id],
           crestUrl: team?.crest_url ?? undefined,
           teamName: team?.name ?? undefined,
+          winnerPick: pick
+            ? {
+                resolved: pick.resolved ?? false,
+                pointsWon: pick.points_won ?? 0,
+                aiModelPick: pick.ai_model_pick ?? null,
+              }
+            : null,
         };
       });
 
@@ -369,6 +399,38 @@ export default function Leaderboard({
                       <span className="text-silver">{member.exactScoreWins} exact</span>
                     </div>
                   )}
+                  {member.teamName && (
+                    <div className="flex items-center gap-1">
+                      <span>🏆</span>
+                      {member.crestUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={member.crestUrl} alt="" className="h-3.5 w-3.5 object-contain" />
+                      )}
+                      <span className="text-silver">{member.teamName}</span>
+                      {!member.winnerPick?.resolved ? (
+                        <span className="text-silver">–</span>
+                      ) : teamPickCorrect(member.winnerPick.pointsWon) ? (
+                        <span className="text-emerald-500 dark:text-emerald-400">✓</span>
+                      ) : (
+                        <span className="text-red-500 dark:text-red-400">✗</span>
+                      )}
+                    </div>
+                  )}
+                  {member.winnerPick?.aiModelPick && (
+                    <div className="flex items-center gap-1">
+                      <span>{AI_MODEL_LABELS[member.winnerPick.aiModelPick]?.emoji}</span>
+                      <span className="text-silver">
+                        {AI_MODEL_LABELS[member.winnerPick.aiModelPick]?.label}
+                      </span>
+                      {!member.winnerPick.resolved ? (
+                        <span className="text-silver">–</span>
+                      ) : aiPickCorrect(member.winnerPick.pointsWon) ? (
+                        <span className="text-emerald-500 dark:text-emerald-400">✓</span>
+                      ) : (
+                        <span className="text-red-500 dark:text-red-400">✗</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </button>
@@ -379,6 +441,46 @@ export default function Leaderboard({
                 {!isLoading && betDetails?.length === 0 && (
                   <p className="text-silver text-xs">No bets yet</p>
                 )}
+                {!isLoading &&
+                  member.winnerPick &&
+                  (member.teamName || member.winnerPick.aiModelPick) && (
+                    <div className="mb-2.5 space-y-1">
+                      {member.teamName && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-silver min-w-0 flex-1">🏆 Tournament winner</span>
+                          <span className="shrink-0 font-medium">{member.teamName}</span>
+                          {!member.winnerPick.resolved ? (
+                            <span className="text-silver shrink-0">–</span>
+                          ) : teamPickCorrect(member.winnerPick.pointsWon) ? (
+                            <span className="shrink-0 text-emerald-500 dark:text-emerald-400">
+                              ✓ +10
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-red-500 dark:text-red-400">✗</span>
+                          )}
+                        </div>
+                      )}
+                      {member.winnerPick.aiModelPick && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-silver min-w-0 flex-1">🤖 Best AI</span>
+                          <span className="shrink-0 font-medium">
+                            {AI_MODEL_LABELS[member.winnerPick.aiModelPick]?.emoji}{" "}
+                            {AI_MODEL_LABELS[member.winnerPick.aiModelPick]?.label}
+                          </span>
+                          {!member.winnerPick.resolved ? (
+                            <span className="text-silver shrink-0">–</span>
+                          ) : aiPickCorrect(member.winnerPick.pointsWon) ? (
+                            <span className="shrink-0 text-emerald-500 dark:text-emerald-400">
+                              ✓ +5
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-red-500 dark:text-red-400">✗</span>
+                          )}
+                        </div>
+                      )}
+                      <div className="border-t border-white/10 pt-1" />
+                    </div>
+                  )}
                 {!isLoading && betDetails && betDetails.length > 0 && (
                   <div className="space-y-1.5">
                     {betDetails.map((bet) => {
