@@ -1,6 +1,12 @@
 import { createServiceClient } from "./supabase/server";
 import { fetchTeams, fetchMatches, fetchStandings, FdStandingEntry } from "./football-api";
-import { winnerToPrediction, RESULT_POINTS, EXACT_SCORE_POINTS } from "./betting";
+import {
+  winnerToPrediction,
+  RESULT_POINTS,
+  EXACT_SCORE_POINTS,
+  WINNER_PICK_POINTS,
+  AI_PICK_POINTS,
+} from "./betting";
 import { resolveAiPicks } from "./ai-picks";
 import { FdMatch } from "./types";
 
@@ -156,6 +162,8 @@ export async function syncMatches(): Promise<{
     Promise.all(newlyCancelled.map((m) => cancelMatch(m.id))),
   ]);
   betsResolved = [...resolvedCounts, ...cancelledCounts].reduce((s, n) => s + n, 0);
+
+  await resolveWinnerPicks();
 
   return { matchesUpdated: rows.length, betsResolved };
 }
@@ -320,6 +328,63 @@ async function resolveMatch(
   await resolveAiPicks(matchId, winner, homeScore, awayScore);
 
   return totalResolved;
+}
+
+/**
+ * Resolve tournament winner picks (team pick + AI model pick) once the Final is settled.
+ * Idempotent: skips picks already marked resolved. Called after match resolutions so AI
+ * member points are fully updated before determining the AI leaderboard winner.
+ */
+async function resolveWinnerPicks(): Promise<void> {
+  const supabase = createServiceClient();
+
+  // Only proceed once the Final has a decisive winner
+  const { data: finalMatch } = await supabase
+    .from("matches")
+    .select("winner, home_team_id, away_team_id")
+    .eq("stage", "FINAL")
+    .eq("status", "FINISHED")
+    .maybeSingle();
+
+  if (!finalMatch || !isDecisiveWinner(finalMatch.winner, "FINAL")) return;
+
+  const { data: unresolvedPicks } = await supabase
+    .from("winner_picks")
+    .select("id, member_id, team_id, ai_model_pick")
+    .eq("resolved", false);
+
+  if (!unresolvedPicks?.length) return;
+
+  const championTeamId =
+    finalMatch.winner === "HOME_TEAM" ? finalMatch.home_team_id : finalMatch.away_team_id;
+
+  // Winning AI: highest points among global AI members
+  const { data: aiMembers } = await supabase
+    .from("members")
+    .select("ai_model, points")
+    .eq("is_ai", true)
+    .eq("is_global", true)
+    .order("points", { ascending: false })
+    .limit(1);
+
+  const topAiModel = aiMembers?.[0]?.ai_model ?? null;
+
+  const ops: PromiseLike<unknown>[] = [];
+
+  for (const pick of unresolvedPicks) {
+    const teamPoints = pick.team_id === championTeamId ? WINNER_PICK_POINTS : 0;
+    const aiPoints = topAiModel && pick.ai_model_pick === topAiModel ? AI_PICK_POINTS : 0;
+    const total = teamPoints + aiPoints;
+
+    ops.push(
+      supabase.from("winner_picks").update({ resolved: true, points_won: total }).eq("id", pick.id)
+    );
+    if (total > 0) {
+      ops.push(supabase.rpc("increment_points", { p_member_id: pick.member_id, p_amount: total }));
+    }
+  }
+
+  await Promise.all(ops);
 }
 
 /** Delete unresolved bets for a cancelled/postponed match — no penalty */
