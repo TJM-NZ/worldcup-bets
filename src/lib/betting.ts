@@ -3,6 +3,7 @@ import { Prediction } from "./types";
 export const RESULT_POINTS = 3;
 export const EXACT_SCORE_POINTS = 5;
 export const WINNER_PICK_POINTS = 10;
+export const AI_PICK_POINTS = 5;
 
 /**
  * Map football-data.org winner values to our prediction format.
